@@ -2,262 +2,191 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Hast Rekha — The AI Palmist</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>Palmly — Read Your Palm with AI</title>
+<meta name="description" content="Palmly reads your palm with AI. Upload a photo, get a fun, detailed reading about your life, love, career and future." />
+<meta name="theme-color" content="#1b1145" />
+
+<!-- Open Graph for social sharing (Facebook / Insta / WhatsApp) -->
+<meta property="og:title" content="Palmly — Read Your Palm with AI" />
+<meta property="og:description" content="Upload a photo of your palm and get a fun, detailed AI reading of your life, love, and future. ✋✨" />
+<meta property="og:type" content="website" />
+<meta property="og:url" content="https://palmist.getbriefed.to" />
+
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Marcellus&family=Cormorant+SC:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,700;0,9..144,900;1,9..144,500&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
   :root {
-    --ink: #1a1410;
-    --parchment: #f4ead5;
-    --parchment-deep: #e8dcc0;
-    --gold: #b8860b;
-    --gold-light: #d4a830;
-    --gold-deep: #8b6508;
-    --crimson: #722f37;
-    --crimson-deep: #4a1c20;
-    --shadow: rgba(26, 20, 16, 0.4);
+    /* Palmly palette — bright, playful, contrasting, a little cosmic */
+    --indigo: #1b1145;        /* deep night base */
+    --indigo-2: #2d1b69;      /* lighter night */
+    --grape: #6c3bf4;         /* electric violet */
+    --coral: #ff5d73;         /* hot coral */
+    --marigold: #ffb23e;      /* warm gold */
+    --peach: #ffd6a5;         /* soft peach */
+    --mint: #4ee6c4;          /* bright contrast pop */
+    --cream: #fff6ee;         /* near-white text */
+    --cream-dim: rgba(255, 246, 238, 0.72);
+    --ink: #1a0f33;
   }
-  * { box-sizing: border-box; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   body {
     margin: 0;
-    font-family: 'Cormorant Garamond', serif;
-    background: var(--ink);
-    color: var(--parchment);
+    font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+    color: var(--cream);
     min-height: 100vh;
     overflow-x: hidden;
+    background: var(--indigo);
   }
-  .bg-cosmos {
+  .bg-aurora {
+    position: relative;
     background:
-      radial-gradient(ellipse at 20% 30%, rgba(184, 134, 11, 0.15) 0%, transparent 50%),
-      radial-gradient(ellipse at 80% 70%, rgba(114, 47, 55, 0.2) 0%, transparent 50%),
-      radial-gradient(circle at 50% 50%, #2a1f18 0%, #1a1410 70%, #0d0a08 100%);
-    position: relative;
+      radial-gradient(ellipse 80% 60% at 15% 0%, rgba(108, 59, 244, 0.55) 0%, transparent 55%),
+      radial-gradient(ellipse 70% 50% at 90% 15%, rgba(255, 93, 115, 0.45) 0%, transparent 50%),
+      radial-gradient(ellipse 90% 70% at 50% 100%, rgba(255, 178, 62, 0.35) 0%, transparent 55%),
+      linear-gradient(160deg, var(--indigo) 0%, var(--indigo-2) 55%, var(--ink) 100%);
   }
-  .bg-cosmos::before {
+  .bg-aurora::before {
     content: '';
-    position: absolute;
-    inset: 0;
+    position: absolute; inset: 0;
     background-image:
-      radial-gradient(1px 1px at 10% 20%, rgba(212, 168, 48, 0.5), transparent),
-      radial-gradient(1px 1px at 80% 40%, rgba(212, 168, 48, 0.4), transparent),
-      radial-gradient(1px 1px at 30% 80%, rgba(212, 168, 48, 0.6), transparent),
-      radial-gradient(1px 1px at 90% 90%, rgba(212, 168, 48, 0.3), transparent),
-      radial-gradient(1px 1px at 50% 10%, rgba(212, 168, 48, 0.5), transparent),
-      radial-gradient(1px 1px at 70% 60%, rgba(212, 168, 48, 0.4), transparent),
-      radial-gradient(1px 1px at 15% 65%, rgba(212, 168, 48, 0.4), transparent);
-    background-size: 100% 100%;
+      radial-gradient(2px 2px at 12% 22%, rgba(78,230,196,0.7), transparent),
+      radial-gradient(2px 2px at 82% 42%, rgba(255,246,238,0.6), transparent),
+      radial-gradient(1.5px 1.5px at 32% 82%, rgba(255,178,62,0.7), transparent),
+      radial-gradient(2px 2px at 92% 88%, rgba(255,93,115,0.6), transparent),
+      radial-gradient(1.5px 1.5px at 52% 12%, rgba(255,246,238,0.7), transparent),
+      radial-gradient(2px 2px at 70% 65%, rgba(78,230,196,0.5), transparent);
     pointer-events: none;
-    animation: twinkle 8s ease-in-out infinite;
+    animation: shimmer 6s ease-in-out infinite;
   }
-  @keyframes twinkle {
-    0%, 100% { opacity: 0.4; }
-    50% { opacity: 0.9; }
+  @keyframes shimmer { 0%,100%{opacity:.5} 50%{opacity:1} }
+
+  .display { font-family: 'Fraunces', Georgia, serif; }
+  .grad-text {
+    background: linear-gradient(100deg, var(--marigold) 0%, var(--coral) 45%, var(--grape) 100%);
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent;
   }
-  .display-font { font-family: 'Marcellus', serif; letter-spacing: 0.02em; }
-  .caps-font { font-family: 'Cormorant SC', serif; letter-spacing: 0.15em; }
-  .italic-font { font-family: 'Cormorant Garamond', serif; font-style: italic; }
-  .gold { color: var(--gold-light); }
-  .ornament {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    justify-content: center;
-    color: var(--gold);
+  .grad-text-2 {
+    background: linear-gradient(100deg, var(--mint) 0%, var(--marigold) 100%);
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent;
   }
-  .ornament::before, .ornament::after {
-    content: '';
-    flex: 1;
-    height: 1px;
-    background: linear-gradient(to right, transparent, var(--gold-deep), transparent);
-    max-width: 120px;
+
+  .card {
+    background: rgba(255, 246, 238, 0.06);
+    border: 1.5px solid rgba(255, 246, 238, 0.14);
+    backdrop-filter: blur(16px);
+    border-radius: 28px;
+    box-shadow: 0 20px 60px -20px rgba(0,0,0,0.6);
   }
-  .glyph {
-    font-family: serif;
-    font-size: 1.5rem;
-    color: var(--gold);
-    text-shadow: 0 0 10px rgba(184, 134, 11, 0.5);
+
+  label {
+    font-weight: 700; font-size: 0.7rem; letter-spacing: 0.12em;
+    text-transform: uppercase; color: var(--marigold);
+    margin-bottom: 0.5rem; display: block;
   }
-  .parchment-card {
-    background: linear-gradient(135deg, rgba(244, 234, 213, 0.04) 0%, rgba(244, 234, 213, 0.02) 100%);
-    border: 1px solid rgba(184, 134, 11, 0.3);
-    backdrop-filter: blur(10px);
-    position: relative;
-  }
-  .parchment-card::before {
-    content: '';
-    position: absolute;
-    top: 8px; left: 8px; right: 8px; bottom: 8px;
-    border: 1px solid rgba(184, 134, 11, 0.15);
-    pointer-events: none;
-  }
-  .corner {
-    position: absolute;
-    width: 20px;
-    height: 20px;
-    border: 2px solid var(--gold);
-  }
-  .corner-tl { top: -1px; left: -1px; border-right: none; border-bottom: none; }
-  .corner-tr { top: -1px; right: -1px; border-left: none; border-bottom: none; }
-  .corner-bl { bottom: -1px; left: -1px; border-right: none; border-top: none; }
-  .corner-br { bottom: -1px; right: -1px; border-left: none; border-top: none; }
   input, select {
-    background: rgba(26, 20, 16, 0.6);
-    border: 1px solid rgba(184, 134, 11, 0.4);
-    color: var(--parchment);
-    font-family: 'Cormorant Garamond', serif;
-    font-size: 1.125rem;
-    padding: 0.75rem 1rem;
-    border-radius: 2px;
     width: 100%;
-    transition: all 0.3s;
+    background: rgba(27, 17, 69, 0.5);
+    border: 1.5px solid rgba(255,246,238,0.18);
+    color: var(--cream);
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 1.05rem; font-weight: 500;
+    padding: 0.85rem 1.1rem; border-radius: 16px;
+    transition: all .25s;
   }
   input:focus, select:focus {
-    outline: none;
-    border-color: var(--gold-light);
-    box-shadow: 0 0 0 3px rgba(184, 134, 11, 0.15);
+    outline: none; border-color: var(--mint);
+    box-shadow: 0 0 0 4px rgba(78,230,196,0.18);
   }
-  input::placeholder { color: rgba(244, 234, 213, 0.4); font-style: italic; }
-  label {
-    font-family: 'Cormorant SC', serif;
-    letter-spacing: 0.15em;
-    font-size: 0.75rem;
-    color: var(--gold-light);
-    margin-bottom: 0.5rem;
-    display: block;
+  input::placeholder { color: rgba(255,246,238,0.4); }
+
+  .btn {
+    width: 100%;
+    background: linear-gradient(100deg, var(--coral) 0%, var(--grape) 100%);
+    color: #fff; font-family: 'Plus Jakarta Sans', sans-serif;
+    font-weight: 800; font-size: 1.1rem; letter-spacing: 0.02em;
+    padding: 1.1rem 2rem; border: none; border-radius: 18px;
+    cursor: pointer; transition: all .25s;
+    box-shadow: 0 12px 30px -8px rgba(255,93,115,0.6);
   }
-  .btn-mystic {
-    background: linear-gradient(135deg, var(--crimson) 0%, var(--crimson-deep) 100%);
-    color: var(--parchment);
-    border: 1px solid var(--gold);
-    font-family: 'Cormorant SC', serif;
-    letter-spacing: 0.2em;
-    font-size: 0.875rem;
-    padding: 1rem 2rem;
-    cursor: pointer;
-    position: relative;
-    transition: all 0.4s;
-    text-transform: uppercase;
+  .btn:hover:not(:disabled) { transform: translateY(-2px) scale(1.01); box-shadow: 0 18px 40px -8px rgba(108,59,244,0.6); }
+  .btn:active { transform: translateY(0) scale(.99); }
+  .btn:disabled { opacity: .55; cursor: not-allowed; }
+
+  .upload {
+    border: 2.5px dashed rgba(255,246,238,0.3);
+    background: rgba(27,17,69,0.35);
+    padding: 1.6rem 1rem; text-align: center;
+    cursor: pointer; transition: all .25s; border-radius: 20px;
   }
-  .btn-mystic:hover:not(:disabled) {
-    background: linear-gradient(135deg, var(--gold-deep) 0%, var(--crimson) 100%);
-    box-shadow: 0 0 30px rgba(184, 134, 11, 0.4);
-    transform: translateY(-2px);
+  .upload:hover { border-color: var(--mint); background: rgba(78,230,196,0.07); }
+  .upload.filled { padding: .5rem; border-style: solid; border-color: var(--marigold); }
+  .upload img { max-width: 100%; max-height: 190px; border-radius: 14px; margin: 0 auto; display: block; }
+
+  .chip {
+    display: inline-flex; align-items: center; gap: .4rem;
+    background: rgba(78,230,196,0.14); color: var(--mint);
+    font-weight: 700; font-size: .72rem; letter-spacing: .08em;
+    padding: .35rem .8rem; border-radius: 999px; text-transform: uppercase;
   }
-  .btn-mystic:disabled { opacity: 0.5; cursor: not-allowed; }
-  .upload-zone {
-    border: 2px dashed rgba(184, 134, 11, 0.4);
-    background: rgba(26, 20, 16, 0.3);
-    padding: 2rem 1rem;
-    text-align: center;
-    cursor: pointer;
-    transition: all 0.3s;
-    border-radius: 4px;
+
+  .orb {
+    width: 96px; height: 96px; margin: 0 auto; border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, var(--marigold), var(--coral) 55%, var(--grape) 100%);
+    box-shadow: 0 0 70px -5px var(--coral);
+    animation: bob 2s ease-in-out infinite;
   }
-  .upload-zone:hover {
-    border-color: var(--gold-light);
-    background: rgba(184, 134, 11, 0.05);
-  }
-  .upload-zone.has-image {
-    padding: 0.5rem;
-    border-style: solid;
-    border-color: var(--gold);
-  }
-  .upload-zone img {
-    max-width: 100%;
-    max-height: 200px;
-    border-radius: 2px;
-    margin: 0 auto;
-    display: block;
-  }
-  .report {
-    font-family: 'Cormorant Garamond', serif;
-    color: var(--parchment);
-    line-height: 1.8;
-    font-size: 1.0625rem;
-  }
-  .report h1 {
-    font-family: 'Marcellus', serif;
-    font-size: 2rem;
-    color: var(--gold-light);
-    text-align: center;
-    margin: 2rem 0 1rem;
-    letter-spacing: 0.05em;
-  }
-  .report h2 {
-    font-family: 'Marcellus', serif;
-    font-size: 1.5rem;
-    color: var(--gold-light);
-    margin: 2.5rem 0 1rem;
-    padding-bottom: 0.5rem;
-    border-bottom: 1px solid rgba(184, 134, 11, 0.3);
-  }
-  .report h3 {
-    font-family: 'Cormorant SC', serif;
-    font-size: 1.05rem;
-    color: var(--gold);
-    margin: 1.5rem 0 0.5rem;
-    letter-spacing: 0.1em;
-  }
+  @keyframes bob { 0%,100%{transform:translateY(0) scale(1)} 50%{transform:translateY(-10px) scale(1.06)} }
+
+  .reveal-up { animation: revealUp .6s cubic-bezier(.2,.8,.2,1) both; }
+  @keyframes revealUp { from{opacity:0; transform:translateY(18px)} to{opacity:1; transform:translateY(0)} }
+
+  /* Reading typography */
+  .report { line-height: 1.8; font-size: 1.05rem; color: var(--cream); }
+  .report h1 { font-family:'Fraunces',serif; font-size: 1.9rem; font-weight: 800; text-align:center; margin: 1.5rem 0 1rem;
+    background: linear-gradient(100deg, var(--marigold), var(--coral) 50%, var(--grape));
+    -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
+  .report h2 { font-family:'Fraunces',serif; font-size: 1.4rem; font-weight: 700; color: var(--marigold);
+    margin: 2.2rem 0 .8rem; padding-bottom:.5rem; border-bottom: 2px solid rgba(255,178,62,0.25); }
+  .report h3 { font-weight: 800; font-size: 1.05rem; color: var(--mint); margin: 1.4rem 0 .4rem; letter-spacing:.02em; }
   .report p { margin: 1rem 0; }
-  .report strong { color: var(--gold-light); font-weight: 600; }
-  .report em { color: rgba(244, 234, 213, 0.85); }
-  .report ul, .report ol { padding-left: 1.5rem; margin: 1rem 0; }
-  .report li { margin: 0.5rem 0; }
-  .report hr {
-    border: none;
-    height: 1px;
-    background: linear-gradient(to right, transparent, var(--gold), transparent);
-    margin: 2.5rem 0;
-  }
-  .loading-orb {
-    width: 80px; height: 80px;
-    margin: 0 auto;
-    border-radius: 50%;
-    background: radial-gradient(circle, var(--gold-light) 0%, var(--crimson) 60%, transparent 80%);
-    box-shadow: 0 0 60px var(--gold);
-    animation: pulse 2s ease-in-out infinite;
-  }
-  @keyframes pulse {
-    0%, 100% { transform: scale(1); opacity: 0.8; }
-    50% { transform: scale(1.15); opacity: 1; }
-  }
-  .typing-line {
-    overflow: hidden;
-    white-space: nowrap;
-    animation: type 3s steps(40) infinite;
-  }
-  @keyframes type {
-    0% { width: 0; }
-    50% { width: 100%; }
-    100% { width: 0; }
-  }
-  details > summary { cursor: pointer; list-style: none; }
-  details > summary::-webkit-details-marker { display: none; }
-  .toggle-arrow { transition: transform 0.3s; }
-  details[open] .toggle-arrow { transform: rotate(90deg); }
-  @media (max-width: 640px) {
-    .report h1 { font-size: 1.5rem; }
-    .report h2 { font-size: 1.25rem; }
-    .report { font-size: 1rem; }
+  .report strong { color: var(--marigold); font-weight: 700; }
+  .report em { color: var(--peach); }
+  .report ul, .report ol { padding-left: 1.4rem; margin: 1rem 0; }
+  .report li { margin: .5rem 0; }
+  .report li::marker { color: var(--coral); }
+  .report hr { border:none; height:2px; background: linear-gradient(to right, transparent, var(--coral), transparent); margin: 2.2rem 0; }
+
+  details > summary { cursor:pointer; list-style:none; }
+  details > summary::-webkit-details-marker { display:none; }
+  .arrow { transition: transform .3s; display:inline-block; }
+  details[open] .arrow { transform: rotate(90deg); }
+
+  .stream-cursor::after { content:'▍'; color: var(--mint); animation: blink 1s steps(2) infinite; }
+  @keyframes blink { 50%{opacity:0} }
+
+  @media (max-width:640px){
+    .report h1{font-size:1.5rem} .report h2{font-size:1.2rem} .report{font-size:1rem}
   }
 </style>
 </head>
-<body class="bg-cosmos">
+<body class="bg-aurora">
 <div id="app"></div>
 
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 <script type="text/babel" data-presets="react">
-const { useState, useRef } = React;
+const { useState } = React;
 
 function App() {
-  const [step, setStep] = useState('intake'); // intake | reading | report
+  const [step, setStep] = useState('intake');
   const [name, setName] = useState('');
-  const [gender, setGender] = useState('Male');
+  const [gender, setGender] = useState('Female');
   const [age, setAge] = useState('');
   const [rightHand, setRightHand] = useState(null);
   const [leftHand, setLeftHand] = useState(null);
@@ -266,65 +195,43 @@ function App() {
   const [report, setReport] = useState('');
   const [error, setError] = useState('');
   const [progress, setProgress] = useState('');
+  const [uploading, setUploading] = useState(null);
 
-  const [uploading, setUploading] = useState(null); // 'right' | 'left' | null
-
-  // Converts any image (incl. HEIC) to a downscaled JPEG data URL via canvas.
-  // The browser decodes HEIC natively on iOS/Safari; canvas re-encodes to JPEG
-  // which the Anthropic API accepts. Also shrinks large phone photos.
-  const processImage = (file) => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const img = new Image();
-        img.onload = () => {
-          const maxDim = 1200;
-          let { width, height } = img;
-          if (width > maxDim || height > maxDim) {
-            if (width > height) {
-              height = Math.round((height * maxDim) / width);
-              width = maxDim;
-            } else {
-              width = Math.round((width * maxDim) / height);
-              height = maxDim;
-            }
-          }
-          const canvas = document.createElement('canvas');
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext('2d');
-          ctx.drawImage(img, 0, 0, width, height);
-          // Always output JPEG — universally accepted by the API
-          const jpegDataUrl = canvas.toDataURL('image/jpeg', 0.88);
-          resolve(jpegDataUrl);
-        };
-        img.onerror = () => reject(new Error('Could not read this image. Try a JPEG or PNG.'));
-        img.src = event.target.result;
+  // Convert any image (incl. iPhone HEIC) to a downscaled JPEG via canvas.
+  const processImage = (file) => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const img = new Image();
+      img.onload = () => {
+        const maxDim = 1100;
+        let { width, height } = img;
+        if (width > maxDim || height > maxDim) {
+          if (width > height) { height = Math.round(height*maxDim/width); width = maxDim; }
+          else { width = Math.round(width*maxDim/height); height = maxDim; }
+        }
+        const c = document.createElement('canvas');
+        c.width = width; c.height = height;
+        c.getContext('2d').drawImage(img, 0, 0, width, height);
+        resolve(c.toDataURL('image/jpeg', 0.86));
       };
-      reader.onerror = () => reject(new Error('Could not read the file.'));
-      reader.readAsDataURL(file);
-    });
-  };
+      img.onerror = () => reject(new Error('Could not read this image. Try a JPEG or PNG.'));
+      img.src = ev.target.result;
+    };
+    reader.onerror = () => reject(new Error('Could not read the file.'));
+    reader.readAsDataURL(file);
+  });
 
-  const handleImageUpload = async (e, hand) => {
+  const handleUpload = async (e, hand) => {
     const file = e.target.files[0];
     if (!file) return;
-    setError('');
-    setUploading(hand);
+    setError(''); setUploading(hand);
     try {
       const jpeg = await processImage(file);
-      if (hand === 'right') {
-        setRightHand(jpeg);
-        setRightPreview(jpeg);
-      } else {
-        setLeftHand(jpeg);
-        setLeftPreview(jpeg);
-      }
+      if (hand === 'right') { setRightHand(jpeg); setRightPreview(jpeg); }
+      else { setLeftHand(jpeg); setLeftPreview(jpeg); }
     } catch (err) {
-      setError(err.message || 'That image could not be processed. Please try another photo.');
-    } finally {
-      setUploading(null);
-    }
+      setError(err.message || 'That image could not be processed.');
+    } finally { setUploading(null); }
   };
 
   const clearImage = (hand) => {
@@ -333,108 +240,58 @@ function App() {
   };
 
   const generateReport = async () => {
-    if (!name.trim() || !age.trim()) {
-      setError('Please enter both name and age.');
-      return;
-    }
-    if (!rightHand && !leftHand) {
-      setError('Please upload at least one palm image.');
-      return;
-    }
-    setError('');
-    setStep('reading');
-    setProgress('Consulting the ancient texts...');
+    if (!name.trim() || !age.trim()) { setError('Please enter your name and age.'); return; }
+    if (!rightHand && !leftHand) { setError('Please add at least one palm photo.'); return; }
+    setError(''); setStep('reading'); setProgress('Warming up the cosmic engine...');
 
     try {
-      // Progress messages while we wait (palm readings take 20-40s)
-      const progressMessages = [
-        'Tracing the lines of the palm...',
-        'Reading the mounts and Mars zones...',
-        'Consulting Rahu and Ketu...',
-        'Weaving the five-year spells...',
-        'Almost there — the reading takes shape...',
-      ];
-      let idx = 0;
-      const progressTimer = setInterval(() => {
-        setProgress(progressMessages[idx % progressMessages.length]);
-        idx++;
-      }, 6000);
+      const msgs = ['Tracing the lines of your palm...','Reading your mounts and stars...','Consulting the planets...','Weaving your five-year forecast...','Almost there — your reading takes shape...'];
+      let i = 0;
+      const timer = setInterval(() => { setProgress(msgs[i % msgs.length]); i++; }, 6000);
 
-      // Get pro token from localStorage if present.
-      // iOS Safari (private mode / strict settings) can throw on localStorage
-      // access — wrap defensively so it never breaks the reading.
-      let proToken = '';
-      let proEmail = '';
-      try {
-        proToken = window.localStorage.getItem('palmist_pro_token') || '';
-        proEmail = window.localStorage.getItem('palmist_pro_email') || '';
-      } catch (storageErr) {
-        proToken = '';
-        proEmail = '';
-      }
+      let proToken = '', proEmail = '';
+      try { proToken = localStorage.getItem('palmly_pro_token') || ''; proEmail = localStorage.getItem('palmly_pro_email') || ''; } catch {}
 
       const headers = { 'Content-Type': 'application/json' };
       if (proToken) headers['X-Pro-Token'] = proToken;
 
       const response = await fetch('/api/read-palm', {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          name: String(name),
-          gender: String(gender),
-          age: String(age),
-          rightHand: rightHand || null,
-          leftHand: leftHand || null,
-          email: proEmail,
-        }),
+        method: 'POST', headers,
+        body: JSON.stringify({ name:String(name), gender:String(gender), age:String(age), rightHand:rightHand||null, leftHand:leftHand||null, email:proEmail }),
       });
+      clearInterval(timer);
 
-      clearInterval(progressTimer);
-
-      // If the server returned an error, it comes back as JSON (not a stream).
-      const contentType = response.headers.get('content-type') || '';
-      if (!response.ok || contentType.includes('application/json')) {
+      const ct = response.headers.get('content-type') || '';
+      if (!response.ok || ct.includes('application/json')) {
         let data = {};
         try { data = await response.json(); } catch {}
-        if (data.upgrade) {
-          setError(data.error || 'Free readings exhausted.');
-          setStep('intake');
-          return;
-        }
+        if (data.upgrade) { setError(data.error || 'Free readings used up.'); setStep('intake'); return; }
         throw new Error(data.error || 'Reading failed.');
       }
 
-      // Success: stream the plain-text reading as it arrives.
-      setStep('report');
-      setReport('');
+      setStep('report'); setReport('');
       const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let accumulated = '';
+      const dec = new TextDecoder();
+      let acc = '';
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-        accumulated += decoder.decode(value, { stream: true });
-        setReport(accumulated);
+        acc += dec.decode(value, { stream: true });
+        setReport(acc);
       }
-
-      if (!accumulated.trim()) {
-        throw new Error('The reading came back empty. Please try again.');
-      }
+      if (!acc.trim()) throw new Error('The reading came back empty. Please try again.');
     } catch (err) {
-      setError(err.message || 'The cosmic forces are obscured. Please try again.');
+      setError(err.message || 'The stars are clouded. Please try again.');
       setStep('intake');
     }
   };
 
   const reset = () => {
-    setStep('intake');
-    setName(''); setAge(''); setGender('Male');
-    setRightHand(null); setLeftHand(null);
-    setRightPreview(null); setLeftPreview(null);
+    setStep('intake'); setName(''); setAge(''); setGender('Female');
+    setRightHand(null); setLeftHand(null); setRightPreview(null); setLeftPreview(null);
     setReport(''); setError('');
   };
 
-  // Markdown to HTML
   const renderReport = (md) => {
     let html = md
       .replace(/^# (.*$)/gim, '<h1>$1</h1>')
@@ -444,242 +301,144 @@ function App() {
       .replace(/\*(.*?)\*/g, '<em>$1</em>')
       .replace(/^---$/gim, '<hr/>')
       .replace(/^- (.*$)/gim, '<li>$1</li>')
-      .split('\n\n')
-      .map(para => {
-        if (para.startsWith('<h') || para.startsWith('<hr') || para.startsWith('<li')) return para;
-        if (para.trim() === '') return '';
-        return '<p>' + para.replace(/\n/g, '<br/>') + '</p>';
-      })
-      .join('\n')
-      .replace(/(<li>.*?<\/li>\n?)+/g, m => '<ul>' + m + '</ul>');
+      .split('\n\n').map(p => {
+        if (p.startsWith('<h')||p.startsWith('<hr')||p.startsWith('<li')) return p;
+        if (p.trim()==='') return '';
+        return '<p>'+p.replace(/\n/g,'<br/>')+'</p>';
+      }).join('\n')
+      .replace(/(<li>.*?<\/li>\n?)+/g, m => '<ul>'+m+'</ul>');
     return { __html: html };
   };
 
+  const Logo = () => (
+    <div className="flex items-center justify-center gap-2 mb-3">
+      <span style={{fontSize:'2rem'}}>✋</span>
+      <span className="display grad-text" style={{fontSize:'2.6rem', fontWeight:900, letterSpacing:'-0.02em'}}>Palmly</span>
+      <span style={{fontSize:'1.4rem'}}>✨</span>
+    </div>
+  );
+
   return (
-    <div className="min-h-screen relative">
-      {/* Header */}
-      <header className="relative z-10 pt-12 pb-8 px-4 text-center">
-        <div className="ornament mb-4">
-          <span className="glyph">☽</span>
-          <span className="glyph">✦</span>
-          <span className="glyph">☉</span>
-        </div>
-        <h1 className="display-font text-4xl sm:text-5xl mb-2" style={{color:'var(--gold-light)'}}>
-          Hast Rekha
-        </h1>
-        <p className="caps-font text-xs sm:text-sm gold opacity-80">The Reading of Hands</p>
-        <p className="italic-font text-sm mt-4 opacity-70 max-w-md mx-auto px-4">
-          "The lines of the hand are the map of a life. Read them, and you read the soul."
+    <div className="min-h-screen relative" style={{zIndex:1}}>
+      <header className="relative pt-12 pb-6 px-4 text-center reveal-up" style={{zIndex:2}}>
+        <Logo />
+        <p className="font-bold tracking-wide" style={{color:'var(--cream-dim)', fontSize:'1rem'}}>
+          Your palm, read by AI ✋ in 30 seconds
         </p>
       </header>
 
       {step === 'intake' && (
-        <main className="relative z-10 px-4 pb-12 max-w-2xl mx-auto">
-          <div className="parchment-card p-6 sm:p-8 relative">
-            <span className="corner corner-tl"></span>
-            <span className="corner corner-tr"></span>
-            <span className="corner corner-bl"></span>
-            <span className="corner corner-br"></span>
-
-            <div className="ornament mb-6">
-              <span className="caps-font text-xs">The Seeker</span>
+        <main className="relative px-4 pb-16 max-w-xl mx-auto reveal-up" style={{zIndex:2}}>
+          <div className="card p-6 sm:p-8">
+            <div className="text-center mb-6">
+              <span className="chip">🔮 Free reading</span>
             </div>
 
             <div className="space-y-5">
               <div>
-                <label>Name</label>
-                <input
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Enter the seeker's name"
-                />
+                <label>Your name</label>
+                <input value={name} onChange={e=>setName(e.target.value)} placeholder="What should we call you?" />
               </div>
-
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label>Gender</label>
-                  <select value={gender} onChange={(e) => setGender(e.target.value)}>
-                    <option>Male</option>
-                    <option>Female</option>
-                    <option>Other</option>
+                  <select value={gender} onChange={e=>setGender(e.target.value)}>
+                    <option>Female</option><option>Male</option><option>Other</option>
                   </select>
                 </div>
                 <div>
                   <label>Age</label>
-                  <input
-                    type="number"
-                    value={age}
-                    onChange={(e) => setAge(e.target.value)}
-                    placeholder="Years"
-                    min="1" max="120"
-                  />
+                  <input type="number" value={age} onChange={e=>setAge(e.target.value)} placeholder="Age" min="1" max="120" />
                 </div>
               </div>
 
-              <div className="ornament my-6">
-                <span className="caps-font text-xs">The Hands</span>
+              <div className="text-center pt-1">
+                <span className="font-bold" style={{color:'var(--marigold)', fontSize:'.8rem', letterSpacing:'.1em', textTransform:'uppercase'}}>📸 Add your palm</span>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label>Right Hand</label>
-                  <label className={`upload-zone block ${rightPreview ? 'has-image' : ''}`}>
-                    {rightPreview ? (
-                      <div>
-                        <img src={rightPreview} alt="Right hand" />
-                        <button
-                          type="button"
-                          onClick={(e) => { e.preventDefault(); clearImage('right'); }}
-                          className="text-xs gold mt-2 underline"
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    ) : (
-                      <div>
-                        <div className="glyph mb-2">✋</div>
-                        <p className="caps-font text-xs opacity-70">Upload photo</p>
-                        <p className="italic-font text-xs opacity-50 mt-1">The active self</p>
-                      </div>
-                    )}
-                    <input
-                      type="file"
-                      accept="image/*,.heic,.heif"
-                      className="hidden"
-                      onChange={(e) => handleImageUpload(e, 'right')}
-                    />
-                  </label>
-                </div>
-
-                <div>
-                  <label>Left Hand</label>
-                  <label className={`upload-zone block ${leftPreview ? 'has-image' : ''}`}>
-                    {leftPreview ? (
-                      <div>
-                        <img src={leftPreview} alt="Left hand" />
-                        <button
-                          type="button"
-                          onClick={(e) => { e.preventDefault(); clearImage('left'); }}
-                          className="text-xs gold mt-2 underline"
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    ) : (
-                      <div>
-                        <div className="glyph mb-2">🤚</div>
-                        <p className="caps-font text-xs opacity-70">Upload photo</p>
-                        <p className="italic-font text-xs opacity-50 mt-1">The inner self</p>
-                      </div>
-                    )}
-                    <input
-                      type="file"
-                      accept="image/*,.heic,.heif"
-                      className="hidden"
-                      onChange={(e) => handleImageUpload(e, 'left')}
-                    />
-                  </label>
-                </div>
+              <div className="grid grid-cols-2 gap-3">
+                {[['right','Right hand','✋'],['left','Left hand','🤚']].map(([hand,labelText,emoji]) => {
+                  const preview = hand==='right'?rightPreview:leftPreview;
+                  return (
+                    <div key={hand}>
+                      <label>{labelText}</label>
+                      <label className={`upload block ${preview?'filled':''}`}>
+                        {preview ? (
+                          <div>
+                            <img src={preview} alt={labelText} />
+                            <button type="button" onClick={(e)=>{e.preventDefault();clearImage(hand);}} className="font-bold mt-2 underline" style={{color:'var(--coral)', fontSize:'.8rem'}}>Remove</button>
+                          </div>
+                        ) : uploading===hand ? (
+                          <div style={{padding:'1rem 0'}}><div className="orb" style={{width:40,height:40}}></div></div>
+                        ) : (
+                          <div>
+                            <div style={{fontSize:'1.8rem'}}>{emoji}</div>
+                            <p className="font-bold mt-1" style={{fontSize:'.85rem'}}>Tap to add</p>
+                          </div>
+                        )}
+                        <input type="file" accept="image/*,.heic,.heif" className="hidden" onChange={e=>handleUpload(e,hand)} />
+                      </label>
+                    </div>
+                  );
+                })}
               </div>
+              <p className="text-center" style={{color:'var(--cream-dim)', fontSize:'.85rem'}}>One hand works. Both reveal more. 🌟</p>
 
-              <p className="italic-font text-xs opacity-60 text-center mt-2">
-                One hand will suffice. Both reveal more.
-              </p>
+              {error && <div className="text-center font-semibold" style={{color:'var(--coral)'}}>{error}</div>}
 
-              {error && (
-                <div className="text-center text-sm" style={{color:'#c9716e'}}>
-                  {error}
-                </div>
-              )}
-
-              <div className="text-center pt-4">
-                <button onClick={generateReport} className="btn-mystic">
-                  Reveal the Reading
-                </button>
-              </div>
+              <button onClick={generateReport} className="btn" disabled={uploading}>
+                Reveal My Reading ✨
+              </button>
             </div>
           </div>
 
-          <details className="mt-6 parchment-card p-4 relative">
-            <summary className="flex items-center gap-2 caps-font text-xs gold">
-              <span className="toggle-arrow">▸</span>
-              About this reading
+          <details className="mt-5 card p-4">
+            <summary className="flex items-center gap-2 font-bold" style={{color:'var(--marigold)', fontSize:'.85rem'}}>
+              <span className="arrow">▸</span> Is this for real?
             </summary>
-            <div className="italic-font text-sm opacity-80 mt-3 leading-relaxed">
-              Palmistry is an interpretive tradition spanning thousands of years across cultures. This reading draws on both classical Indian Samudrik Shastra and Western palmistry frameworks. It is offered as a mirror for reflection — not as medical, financial, or predictive guidance. Take what resonates; leave what does not.
-            </div>
+            <p style={{color:'var(--cream-dim)', fontSize:'.92rem', marginTop:'.6rem', lineHeight:1.6}}>
+              Palmistry is a fun, ancient tradition — not science! Palmly blends classic Indian and Western palm-reading wisdom into a playful reading just for you. Take what sparks joy, leave the rest. 💛
+            </p>
           </details>
         </main>
       )}
 
       {step === 'reading' && (
-        <main className="relative z-10 px-4 py-20 max-w-xl mx-auto text-center">
-          <div className="loading-orb mb-8"></div>
-          <p className="caps-font text-sm gold mb-4">The Reading Unfolds</p>
-          <p className="italic-font text-lg opacity-80">{progress}</p>
-          <div className="mt-8 opacity-60">
-            <div className="typing-line italic-font text-sm">Tracing the lines of fate...</div>
-          </div>
+        <main className="relative px-4 py-20 max-w-md mx-auto text-center reveal-up" style={{zIndex:2}}>
+          <div className="orb mb-8"></div>
+          <p className="display grad-text-2" style={{fontSize:'1.6rem', fontWeight:700, marginBottom:'.5rem'}}>Reading your palm</p>
+          <p className="font-medium" style={{color:'var(--cream-dim)', fontSize:'1.05rem'}}>{progress}</p>
         </main>
       )}
 
       {step === 'report' && (
-        <main className="relative z-10 px-4 pb-12 max-w-3xl mx-auto">
-          <div className="parchment-card p-6 sm:p-10 relative">
-            <span className="corner corner-tl"></span>
-            <span className="corner corner-tr"></span>
-            <span className="corner corner-bl"></span>
-            <span className="corner corner-br"></span>
-
-            <div className="ornament mb-2">
-              <span className="caps-font text-xs">A Reading For</span>
-            </div>
-            <h1 className="display-font text-3xl text-center mb-1" style={{color:'var(--gold-light)'}}>
-              {name}
-            </h1>
-            <p className="caps-font text-xs text-center opacity-70 mb-8">
-              {gender} · {age} years
-            </p>
-
-            <div className="ornament mb-8">
-              <span className="glyph">✦</span>
-            </div>
-
-            <div className="report" dangerouslySetInnerHTML={renderReport(report)} />
-
-            <div className="ornament mt-12 mb-6">
-              <span className="glyph">☽ ✦ ☉</span>
-            </div>
-
-            <div className="text-center space-y-3">
-              <button onClick={reset} className="btn-mystic">
-                Read Another Hand
+        <main className="relative px-4 pb-16 max-w-2xl mx-auto reveal-up" style={{zIndex:2}}>
+          <div className="card p-6 sm:p-9">
+            <div className="text-center mb-2"><span className="chip">✨ {name}'s reading</span></div>
+            <div className="report stream-cursor" dangerouslySetInnerHTML={renderReport(report)} />
+            <div className="mt-10 space-y-3">
+              <button onClick={reset} className="btn">Read Another Palm ✋</button>
+              <button onClick={()=>{
+                const shareText = `I just got my palm read by Palmly! ✋✨ Try yours free:`;
+                const url = 'https://palmist.getbriefed.to';
+                if (navigator.share) { navigator.share({title:'Palmly', text:shareText, url}).catch(()=>{}); }
+                else { navigator.clipboard?.writeText(url); alert('Link copied! Share it with friends ✨'); }
+              }} className="w-full font-bold underline" style={{color:'var(--mint)', background:'none', border:'none', cursor:'pointer', fontSize:'.95rem'}}>
+                Share Palmly with a friend 💌
               </button>
-              <div>
-                <button
-                  onClick={() => window.print()}
-                  className="caps-font text-xs gold underline opacity-80 hover:opacity-100"
-                >
-                  Print this reading
-                </button>
-              </div>
             </div>
           </div>
         </main>
       )}
 
-      <footer className="relative z-10 text-center py-8 px-4">
-        <div className="ornament">
-          <span className="caps-font text-xs opacity-50">Built with reverence · The lines speak</span>
-        </div>
+      <footer className="relative text-center py-8 px-4" style={{zIndex:2}}>
+        <p style={{color:'var(--cream-dim)', fontSize:'.8rem'}}>Made with ✨ · Palmly reads for fun, not fortune</p>
       </footer>
     </div>
   );
 }
 
-const root = ReactDOM.createRoot(document.getElementById('app'));
-root.render(<App />);
+ReactDOM.createRoot(document.getElementById('app')).render(<App />);
 </script>
 </body>
 </html>
