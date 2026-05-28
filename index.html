@@ -391,9 +391,11 @@ function App() {
 
       clearInterval(progressTimer);
 
-      const data = await response.json();
-
-      if (!response.ok) {
+      // If the server returned an error, it comes back as JSON (not a stream).
+      const contentType = response.headers.get('content-type') || '';
+      if (!response.ok || contentType.includes('application/json')) {
+        let data = {};
+        try { data = await response.json(); } catch {}
         if (data.upgrade) {
           setError(data.error || 'Free readings exhausted.');
           setStep('intake');
@@ -402,8 +404,22 @@ function App() {
         throw new Error(data.error || 'Reading failed.');
       }
 
-      setReport(data.reading);
+      // Success: stream the plain-text reading as it arrives.
       setStep('report');
+      setReport('');
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let accumulated = '';
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        accumulated += decoder.decode(value, { stream: true });
+        setReport(accumulated);
+      }
+
+      if (!accumulated.trim()) {
+        throw new Error('The reading came back empty. Please try again.');
+      }
     } catch (err) {
       setError(err.message || 'The cosmic forces are obscured. Please try again.');
       setStep('intake');
