@@ -2,13 +2,33 @@
 // Vercel serverless function — proxies to Anthropic API, keeps key server-side
 
 export const config = {
-  maxDuration: 60, // 60s timeout (Hobby plan limit)
-  api: {
-    bodyParser: {
-      sizeLimit: '10mb', // palm photos can be large
-    },
-  },
+  maxDuration: 300, // Pro plan allows up to 300s; streaming keeps us well under
 };
+
+// Read and parse the JSON body with a generous size cap (palm photos are large).
+// Plain Vercel Node functions don't honor the old bodyParser config, so we
+// read the raw stream ourselves to avoid the platform's default size crash.
+async function readJsonBody(req) {
+  // If Vercel already parsed it (object), use it directly.
+  if (req.body && typeof req.body === 'object') return req.body;
+  return new Promise((resolve, reject) => {
+    let data = '';
+    req.on('data', (chunk) => {
+      data += chunk;
+      if (data.length > 25 * 1024 * 1024) { // 25MB hard cap
+        reject(new Error('Request too large. Please use smaller photos.'));
+      }
+    });
+    req.on('end', () => {
+      try {
+        resolve(data ? JSON.parse(data) : {});
+      } catch (e) {
+        reject(new Error('Invalid request body.'));
+      }
+    });
+    req.on('error', reject);
+  });
+}
 
 // Simple in-memory rate limit (resets on cold start — fine for v1)
 // For production: replace with Upstash Redis or Supabase counter
@@ -103,10 +123,11 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   try {
-    const { name, gender, age, rightHand, leftHand, email } = req.body;
+    const body = await readJsonBody(req);
+    const { name, gender, age, rightHand, leftHand, email } = body;
 
     // Validation
-    if (!name?.trim() || !age) {
+    if (!name || !String(name).trim() || !age) {
       return res.status(400).json({ error: 'Name and age are required.' });
     }
     if (!rightHand && !leftHand) {
@@ -155,7 +176,8 @@ export default async function handler(req, res) {
       content.push({ type: 'text', text: '↑ LEFT hand.' });
     }
 
-    // Call Anthropic
+    // Call Anthropic with streaming enabled — keeps the connection alive and
+    // pipes tokens to the browser as they generate, avoiding the 60s timeout.
     const anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -164,8 +186,9 @@ export default async function handler(req, res) {
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-5',
+        model: 'claude-sonnet-4-6',
         max_tokens: 8000,
+        stream: true,
         messages: [{ role: 'user', content }],
       }),
     });
@@ -173,28 +196,74 @@ export default async function handler(req, res) {
     if (!anthropicRes.ok) {
       const errText = await anthropicRes.text();
       console.error('Anthropic API error:', anthropicRes.status, errText);
-      return res.status(502).json({ error: 'The reading could not be completed. Please try again.' });
+      let detail = '';
+      try {
+        const parsed = JSON.parse(errText);
+        detail = parsed?.error?.message || '';
+      } catch {
+        detail = errText.slice(0, 200);
+      }
+      return res.status(502).json({
+        error: `The reading could not be completed (status ${anthropicRes.status}). ${detail}`.trim(),
+      });
     }
 
-    const data = await anthropicRes.json();
-    const reading = data.content?.filter(c => c.type === 'text').map(c => c.text).join('\n') || '';
+    // Set up a plain-text streaming response to the browser.
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
+    res.setHeader('X-Accel-Buffering', 'no');
 
-    if (!reading) {
-      return res.status(502).json({ error: 'The reading came back empty. Please try again.' });
+    let fullReading = '';
+    const reader = anthropicRes.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+
+      // Anthropic streams Server-Sent Events: lines beginning with "data: "
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || ''; // keep incomplete line for next chunk
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed.startsWith('data:')) continue;
+        const jsonStr = trimmed.slice(5).trim();
+        if (!jsonStr || jsonStr === '[DONE]') continue;
+        try {
+          const evt = JSON.parse(jsonStr);
+          if (evt.type === 'content_block_delta' && evt.delta?.type === 'text_delta') {
+            const text = evt.delta.text || '';
+            fullReading += text;
+            res.write(text); // pipe straight to browser
+          }
+        } catch {
+          // ignore non-JSON keepalive lines
+        }
+      }
     }
 
-    // Log to Supabase (fire-and-forget — don't block response)
-    logReading({ name, gender, age, email, ip, isPro, length: reading.length }).catch(err =>
+    if (!fullReading) {
+      // Nothing streamed — close gracefully with an error marker
+      res.write('\n\n[The reading came back empty. Please try again.]');
+      return res.end();
+    }
+
+    // Log to Supabase (fire-and-forget — don't block)
+    logReading({ name, gender, age, email, ip, isPro, length: fullReading.length }).catch(err =>
       console.error('Logging failed:', err)
     );
 
-    return res.status(200).json({
-      reading,
-      remaining: rl.remaining,
-      isPro,
-    });
+    return res.end();
   } catch (err) {
     console.error('Handler error:', err);
+    // If headers already sent (streaming started), just close; else send JSON.
+    if (res.headersSent) {
+      try { res.end(); } catch {}
+      return;
+    }
     return res.status(500).json({ error: 'Something went wrong on our end. Please try again.' });
   }
 }
