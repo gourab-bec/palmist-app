@@ -360,19 +360,31 @@ function App() {
         idx++;
       }, 6000);
 
-      // Get pro token from localStorage if present (set after OTP/purchase flow)
-      const proToken = localStorage.getItem('palmist_pro_token') || '';
-      const proEmail = localStorage.getItem('palmist_pro_email') || '';
+      // Get pro token from localStorage if present.
+      // iOS Safari (private mode / strict settings) can throw on localStorage
+      // access — wrap defensively so it never breaks the reading.
+      let proToken = '';
+      let proEmail = '';
+      try {
+        proToken = window.localStorage.getItem('palmist_pro_token') || '';
+        proEmail = window.localStorage.getItem('palmist_pro_email') || '';
+      } catch (storageErr) {
+        proToken = '';
+        proEmail = '';
+      }
+
+      const headers = { 'Content-Type': 'application/json' };
+      if (proToken) headers['X-Pro-Token'] = proToken;
 
       const response = await fetch('/api/read-palm', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(proToken ? { 'X-Pro-Token': proToken } : {}),
-        },
+        headers,
         body: JSON.stringify({
-          name, gender, age,
-          rightHand, leftHand,
+          name: String(name),
+          gender: String(gender),
+          age: String(age),
+          rightHand: rightHand || null,
+          leftHand: leftHand || null,
           email: proEmail,
         }),
       });
