@@ -267,21 +267,64 @@ function App() {
   const [error, setError] = useState('');
   const [progress, setProgress] = useState('');
 
-  const handleImageUpload = (e, hand) => {
+  const [uploading, setUploading] = useState(null); // 'right' | 'left' | null
+
+  // Converts any image (incl. HEIC) to a downscaled JPEG data URL via canvas.
+  // The browser decodes HEIC natively on iOS/Safari; canvas re-encodes to JPEG
+  // which the Anthropic API accepts. Also shrinks large phone photos.
+  const processImage = (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const img = new Image();
+        img.onload = () => {
+          const maxDim = 1200;
+          let { width, height } = img;
+          if (width > maxDim || height > maxDim) {
+            if (width > height) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            } else {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
+            }
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+          // Always output JPEG — universally accepted by the API
+          const jpegDataUrl = canvas.toDataURL('image/jpeg', 0.88);
+          resolve(jpegDataUrl);
+        };
+        img.onerror = () => reject(new Error('Could not read this image. Try a JPEG or PNG.'));
+        img.src = event.target.result;
+      };
+      reader.onerror = () => reject(new Error('Could not read the file.'));
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleImageUpload = async (e, hand) => {
     const file = e.target.files[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const base64 = event.target.result;
+    setError('');
+    setUploading(hand);
+    try {
+      const jpeg = await processImage(file);
       if (hand === 'right') {
-        setRightHand(base64);
-        setRightPreview(base64);
+        setRightHand(jpeg);
+        setRightPreview(jpeg);
       } else {
-        setLeftHand(base64);
-        setLeftPreview(base64);
+        setLeftHand(jpeg);
+        setLeftPreview(jpeg);
       }
-    };
-    reader.readAsDataURL(file);
+    } catch (err) {
+      setError(err.message || 'That image could not be processed. Please try another photo.');
+    } finally {
+      setUploading(null);
+    }
   };
 
   const clearImage = (hand) => {
@@ -474,7 +517,7 @@ function App() {
                     )}
                     <input
                       type="file"
-                      accept="image/*"
+                      accept="image/*,.heic,.heif"
                       className="hidden"
                       onChange={(e) => handleImageUpload(e, 'right')}
                     />
@@ -504,7 +547,7 @@ function App() {
                     )}
                     <input
                       type="file"
-                      accept="image/*"
+                      accept="image/*,.heic,.heif"
                       className="hidden"
                       onChange={(e) => handleImageUpload(e, 'left')}
                     />
