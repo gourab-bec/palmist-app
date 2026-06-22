@@ -1,318 +1,91 @@
-// /api/read-palm.js
-// Vercel serverless function — proxies to Anthropic API, keeps key server-side
+// api/read-palm.js — authenticated. Generates the FULL reading server-side, stores it,
+// and returns ONLY a teaser. The full text never reaches the browser until the reading
+// is unlocked ($2). This replaces the old streaming endpoint.
+import { applyCors, readBody, sendError, httpError, cleanText, rateLimit, clientIp, isAdmin } from './_lib/util.js';
+import { requireAuth } from './_lib/auth.js';
+import { enforceIdentity } from './_lib/identity.js';
+import { claude, imageBlock } from './_lib/anthropic.js';
+import { palmReadingPrompt } from './_lib/prompts.js';
+import { sbInsert, sbSelect } from './_lib/supabase.js';
 
-export const config = {
-  maxDuration: 300, // Pro plan allows up to 300s; streaming keeps us well under
-};
+export const config = { maxDuration: 300 };
 
-// Read and parse the JSON body with a generous size cap (palm photos are large).
-// Plain Vercel Node functions don't honor the old bodyParser config, so we
-// read the raw stream ourselves to avoid the platform's default size crash.
-async function readJsonBody(req) {
-  // If Vercel already parsed it (object), use it directly.
-  if (req.body && typeof req.body === 'object') return req.body;
-  return new Promise((resolve, reject) => {
-    let data = '';
-    req.on('data', (chunk) => {
-      data += chunk;
-      if (data.length > 25 * 1024 * 1024) { // 25MB hard cap
-        reject(new Error('Request too large. Please use smaller photos.'));
-      }
-    });
-    req.on('end', () => {
-      try {
-        resolve(data ? JSON.parse(data) : {});
-      } catch (e) {
-        reject(new Error('Invalid request body.'));
-      }
-    });
-    req.on('error', reject);
-  });
+// Teaser = title + first two sections; the rest is locked.
+function makeTeaser(full) {
+  const idx = nthIndex(full, '\n## ', 3);
+  let t = idx > 0 ? full.slice(0, idx) : full.slice(0, 1100);
+  return t.trim() + '\n\n*…the rest of your reading is ready below.*';
 }
-
-// Simple in-memory rate limit (resets on cold start — fine for v1)
-// For production: replace with Upstash Redis or Supabase counter
-const rateLimits = new Map();
-const RATE_LIMIT_WINDOW = 60 * 60 * 1000; // 1 hour
-const RATE_LIMIT_MAX = 5; // 5 readings per IP per hour for free tier
-
-function getClientIp(req) {
-  return (
-    req.headers['x-forwarded-for']?.split(',')[0].trim() ||
-    req.headers['x-real-ip'] ||
-    req.socket?.remoteAddress ||
-    'unknown'
-  );
-}
-
-function checkRateLimit(ip, isPro) {
-  if (isPro) return { allowed: true };
-  const now = Date.now();
-  const record = rateLimits.get(ip) || { count: 0, windowStart: now };
-
-  if (now - record.windowStart > RATE_LIMIT_WINDOW) {
-    rateLimits.set(ip, { count: 1, windowStart: now });
-    return { allowed: true, remaining: RATE_LIMIT_MAX - 1 };
-  }
-
-  if (record.count >= RATE_LIMIT_MAX) {
-    return {
-      allowed: false,
-      retryAfter: Math.ceil((RATE_LIMIT_WINDOW - (now - record.windowStart)) / 1000),
-    };
-  }
-
-  record.count += 1;
-  rateLimits.set(ip, record);
-  return { allowed: true, remaining: RATE_LIMIT_MAX - record.count };
-}
-
-function buildPrompt({ name, gender, age, handsProvided }) {
-  return `You are acting as a Master Palmist with deep expertise in both classical Indian palmistry (Samudrik Shastra / Hast Rekha) and Western palmistry traditions. Read the attached palm image(s) and produce a best-in-class, detailed report as the most capable palmist would deliver it.
-
-SUBJECT DETAILS
-Name: ${name}
-Gender: ${gender}
-Age: ${age}
-Hand(s) provided: ${handsProvided}
-
-GROUND RULES
-1. Use ONLY what the palm images show. Do not invent details that aren't visible.
-2. Open with a one-line caveat that palmistry is interpretive tradition, not science — then proceed confidently as a master palmist would.
-3. If both hands are provided, contrast the left (inner self / inherited nature) with the right (active self / what they've built) and comment on divergence.
-4. Be specific and grounded in what is actually visible. If a feature is unclear, say so rather than invent.
-5. Do not predict literal date or manner of death. Speak of vitality, life force, and longevity within the tradition's symbolic frame.
-6. Tone: warm, confident, observant — like a wise practitioner sitting across from the person.
-7. Address the subject by name (${name}) periodically through the reading.
-
-REPORT STRUCTURE — cover all of the following with depth:
-
-# A Full Palmistry Reading — ${name}
-
-## Part One: The Hand as a Whole
-Hand shape and elemental type, finger length and tips, skin texture, thumb (set, angle, willpower vs logic phalanges), overall first impression of nature.
-
-## Part Two: The Mounts
-Read each: Jupiter, Saturn, Apollo/Sun, Mercury, Mars (Upper & Lower), Venus, Luna/Moon, Neptune, Rahu zone, Ketu zone — what each indicates about ${name}.
-
-## Part Three: The Major Lines
-Heart Line, Head Line, Life Line, Fate Line, Sun/Apollo Line, Mercury/Health Line, Marriage Line(s), Children Lines, Girdle of Venus, Bracelets/Rascettes, and any special markings (stars, crosses, triangles, squares, islands, grilles).
-
-## Part Four: Each Aspect of Life
-Education, Career, Finance and wealth pattern, Health (physical and mental), Family of origin, Spouse/marriage, Children, Friendships, Enemies and adversaries, Affairs/extramarital patterns past or future (be direct), Travel and foreign connections, Spirituality and inner life, Death indicators (symbolic only, never literal dates).
-
-## Part Five: Future in Five-Year Spells
-Starting from age ${age}, project forward in 5-year increments until the natural endpoint the hand suggests. For each spell describe: dominant theme, career/financial trajectory, relationship and family themes, health considerations, opportunities and challenges, what the phase is building toward.
-
-## Part Six: Closing
-The single most striking feature of the hand. What the left vs. right divergence reveals about agency. The honest "best part" of the reading. An invitation to ask about any zone in more depth.
-
-STYLE
-Flowing prose with clear section headers. Specific observations, not generic claims. Cover the good, the challenging, and the best honestly. Comprehensive length — full detailed report, not summary.
-
-Begin the reading now.`;
+function nthIndex(str, sub, n) {
+  let i = -1;
+  while (n-- > 0) { i = str.indexOf(sub, i + 1); if (i < 0) return -1; }
+  return i;
 }
 
 export default async function handler(req, res) {
-  // CORS
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Pro-Token');
-
-  if (req.method === 'OPTIONS') return res.status(200).end();
+  applyCors(req, res);
+  if (req.method === 'OPTIONS') return res.status(204).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   try {
-    const body = await readJsonBody(req);
-    const { name, gender, age, rightHand, leftHand, email } = body;
+    const auth = requireAuth(req);
+    const owner = auth.sub;
 
-    // Validation
-    if (!name || !String(name).trim() || !age) {
-      return res.status(400).json({ error: 'Name and age are required.' });
-    }
-    if (!rightHand && !leftHand) {
-      return res.status(400).json({ error: 'At least one palm image is required.' });
-    }
+    const { json } = await readBody(req, { maxBytes: 8 * 1024 * 1024 });
+    const name = cleanText(json.name, 80);
+    const gender = cleanText(json.gender, 20);
+    const age = parseInt(json.age, 10);
+    const rightHand = json.rightHand || null;
+    const leftHand = json.leftHand || null;
 
-    // Pro check — Pro tokens skip rate limiting
-    const proToken = req.headers['x-pro-token'];
-    const isPro = await verifyProToken(proToken, email);
+    if (!name) throw httpError(400, 'Name is required.');
+    if (!Number.isInteger(age) || age < 1 || age > 120) throw httpError(400, 'Enter a valid age.');
+    if (!rightHand && !leftHand) throw httpError(400, 'At least one palm photo is required.');
 
-    // Rate limit
-    const ip = getClientIp(req);
-    const rl = checkRateLimit(ip, isPro);
-    if (!rl.allowed) {
-      return res.status(429).json({
-        error: 'Free readings exhausted. Upgrade to Pro for unlimited readings, or wait an hour.',
-        retryAfter: rl.retryAfter,
-        upgrade: true,
-      });
-    }
+    const admin = isAdmin(owner);
 
-    // Build message
-    const handsProvided =
-      rightHand && leftHand ? 'Both right and left hands'
-      : rightHand ? 'Right hand only'
-      : 'Left hand only';
+    // One account = one person (admins are exempt and may read for anyone).
+    if (!admin) await enforceIdentity({ owner, name, age });
 
-    const content = [
-      { type: 'text', text: buildPrompt({ name, gender, age, handsProvided }) },
-    ];
-
-    if (rightHand) {
-      const media_type = rightHand.match(/data:(.*?);/)?.[1] || 'image/jpeg';
-      content.push({
-        type: 'image',
-        source: { type: 'base64', media_type, data: rightHand.split(',')[1] },
-      });
-      content.push({ type: 'text', text: '↑ RIGHT hand.' });
-    }
-    if (leftHand) {
-      const media_type = leftHand.match(/data:(.*?);/)?.[1] || 'image/jpeg';
-      content.push({
-        type: 'image',
-        source: { type: 'base64', media_type, data: leftHand.split(',')[1] },
-      });
-      content.push({ type: 'text', text: '↑ LEFT hand.' });
+    const ip = clientIp(req);
+    if (!admin) {
+      const rl = await rateLimit({ key: `read:${owner}`, max: 10, windowSec: 60 * 60 });
+      if (!rl.allowed) throw httpError(429, 'You have reached the hourly reading limit. Please try again later.', { retryAfter: rl.retryAfter });
+      await rateLimit({ key: `read_ip:${ip}`, max: 30, windowSec: 60 * 60 });
     }
 
-    // Call Anthropic with streaming enabled — keeps the connection alive and
-    // pipes tokens to the browser as they generate, avoiding the 60s timeout.
-    const anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': process.env.ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 8000,
-        stream: true,
-        messages: [{ role: 'user', content }],
-      }),
-    });
+    const handsProvided = rightHand && leftHand ? 'Both right and left hands' : rightHand ? 'Right hand only' : 'Left hand only';
+    const content = [{ type: 'text', text: palmReadingPrompt({ name, gender, age, handsProvided }) }];
+    if (rightHand) content.push(...imageBlock(rightHand, '↑ RIGHT hand.'));
+    if (leftHand) content.push(...imageBlock(leftHand, '↑ LEFT hand.'));
+    if (content.length === 1) throw httpError(400, 'Palm photo must be a JPEG, PNG, or WebP image.');
 
-    if (!anthropicRes.ok) {
-      const errText = await anthropicRes.text();
-      console.error('Anthropic API error:', anthropicRes.status, errText);
-      let detail = '';
-      try {
-        const parsed = JSON.parse(errText);
-        detail = parsed?.error?.message || '';
-      } catch {
-        detail = errText.slice(0, 200);
-      }
-      return res.status(502).json({
-        error: `The reading could not be completed (status ${anthropicRes.status}). ${detail}`.trim(),
-      });
-    }
+    const full = await claude(content, { maxTokens: 8000 });
+    const teaser = makeTeaser(full);
 
-    // Set up a plain-text streaming response to the browser.
-    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-    res.setHeader('Cache-Control', 'no-cache, no-transform');
-    res.setHeader('X-Accel-Buffering', 'no');
+    // Store the reading. NOTE: raw palm images are never persisted (privacy) — only the text.
+    // Admin accounts are auto-unlocked (payment bypassed for testing).
+    const row = await sbInsert('readings', {
+      owner, subject_name: name, subject_gender: gender, subject_age: age,
+      teaser, full_report: full, unlocked: admin, created_at: new Date().toISOString(),
+    }, { returning: true });
 
-    let fullReading = '';
-    const reader = anthropicRes.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
+    // Analytics log (fire-and-forget; keeps the original table populated).
+    sbInsert('palm_readings', {
+      subject_name: name, subject_gender: gender, subject_age: age,
+      requester_email: owner.startsWith('email:') ? owner.slice(6) : null,
+      requester_ip: ip, is_pro: false, reading_length: full.length, created_at: new Date().toISOString(),
+    }).catch((e) => console.error('analytics log failed:', e.message));
 
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
+    // Is this user an active daily-horoscope subscriber?
+    let subscribed = false;
+    try {
+      const subs = await sbSelect('subscriptions', `owner=eq.${encodeURIComponent(owner)}&status=eq.active&select=id&limit=1`);
+      subscribed = Array.isArray(subs) && subs.length > 0;
+    } catch {}
 
-      // Anthropic streams Server-Sent Events: lines beginning with "data: "
-      const lines = buffer.split('\n');
-      buffer = lines.pop() || ''; // keep incomplete line for next chunk
-
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed.startsWith('data:')) continue;
-        const jsonStr = trimmed.slice(5).trim();
-        if (!jsonStr || jsonStr === '[DONE]') continue;
-        try {
-          const evt = JSON.parse(jsonStr);
-          if (evt.type === 'content_block_delta' && evt.delta?.type === 'text_delta') {
-            const text = evt.delta.text || '';
-            fullReading += text;
-            res.write(text); // pipe straight to browser
-          }
-        } catch {
-          // ignore non-JSON keepalive lines
-        }
-      }
-    }
-
-    if (!fullReading) {
-      // Nothing streamed — close gracefully with an error marker
-      res.write('\n\n[The reading came back empty. Please try again.]');
-      return res.end();
-    }
-
-    // Log to Supabase (fire-and-forget — don't block)
-    logReading({ name, gender, age, email, ip, isPro, length: fullReading.length }).catch(err =>
-      console.error('Logging failed:', err)
-    );
-
-    return res.end();
+    return res.status(200).json({ readingId: row.id, teaser, entitled: admin, subscribed });
   } catch (err) {
-    console.error('Handler error:', err);
-    // If headers already sent (streaming started), just close; else send JSON.
-    if (res.headersSent) {
-      try { res.end(); } catch {}
-      return;
-    }
-    return res.status(500).json({ error: 'Something went wrong on our end. Please try again.' });
-  }
-}
-
-// === Supabase logging (optional — runs only if env vars set) ===
-async function logReading({ name, gender, age, email, ip, isPro, length }) {
-  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_KEY) return;
-
-  await fetch(`${process.env.SUPABASE_URL}/rest/v1/palm_readings`, {
-    method: 'POST',
-    headers: {
-      'apikey': process.env.SUPABASE_SERVICE_KEY,
-      'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_KEY}`,
-      'Content-Type': 'application/json',
-      'Prefer': 'return=minimal',
-    },
-    body: JSON.stringify({
-      subject_name: name,
-      subject_gender: gender,
-      subject_age: parseInt(age),
-      requester_email: email || null,
-      requester_ip: ip,
-      is_pro: isPro,
-      reading_length: length,
-      created_at: new Date().toISOString(),
-    }),
-  });
-}
-
-// === Pro token verification (stub — wire to your auth system) ===
-async function verifyProToken(token, email) {
-  if (!token || !email) return false;
-  // For v1: simple shared admin token via env var
-  if (token === process.env.ADMIN_PRO_TOKEN) return true;
-  // For v2: check Supabase pro_users table
-  if (!process.env.SUPABASE_URL) return false;
-  try {
-    const res = await fetch(
-      `${process.env.SUPABASE_URL}/rest/v1/pro_users?email=eq.${encodeURIComponent(email)}&token=eq.${encodeURIComponent(token)}&select=id`,
-      {
-        headers: {
-          'apikey': process.env.SUPABASE_SERVICE_KEY,
-          'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_KEY}`,
-        },
-      }
-    );
-    const data = await res.json();
-    return Array.isArray(data) && data.length > 0;
-  } catch {
-    return false;
+    return sendError(res, err);
   }
 }

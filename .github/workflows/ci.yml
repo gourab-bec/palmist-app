@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+jobs:
+  build-test-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install
+        run: npm ci || npm install
+
+      - name: Build (compile JSX bundle)
+        run: npm run build
+
+      - name: Verify bundle is committed and up to date
+        run: |
+          if ! git diff --quiet -- app.js; then
+            echo "::error::app.js is out of date. Run 'npm run build' and commit the result."
+            git --no-pager diff --stat -- app.js
+            exit 1
+          fi
+
+      - name: Security tests
+        run: npm test
+
+      - name: Dependency audit (high severity fails the build)
+        run: npm audit --audit-level=high
+
+      - name: CSP guard — no unsafe-eval / unsafe-inline scripts, no 3rd-party script hosts
+        run: |
+          CSP=$(node -e "console.log(JSON.parse(require('fs').readFileSync('vercel.json','utf8')).headers[0].headers.find(h=>h.key==='Content-Security-Policy').value)")
+          echo "$CSP"
+          echo "$CSP" | grep -q "script-src 'self'" || { echo "::error::script-src must be 'self'"; exit 1; }
+          if echo "$CSP" | grep -qiE "unsafe-eval"; then echo "::error::unsafe-eval present"; exit 1; fi
+          # ensure no inline-script allowance and no remote script origins
+          SCRIPT_DIRECTIVE=$(echo "$CSP" | grep -oE "script-src[^;]*")
+          echo "$SCRIPT_DIRECTIVE" | grep -qiE "unsafe-inline|https?://" && { echo "::error::script-src is not locked to 'self'"; exit 1; } || true
+
+      - name: Secret scan — no obvious keys committed
+        run: |
+          if grep -REn "sk_live_|sk-ant-|whsec_[A-Za-z0-9]|service_role" --include=*.js --include=*.mjs --include=*.html --include=*.json . | grep -v ".env.example" | grep -v node_modules | grep -v "/tests/"; then
+            echo "::error::Possible secret committed"; exit 1;
+          fi
+          echo "No obvious secrets found."

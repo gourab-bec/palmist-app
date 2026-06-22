@@ -16,7 +16,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,700;0,9..144,900;1,9..144,500&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<script src="https://cdn.tailwindcss.com"></script>
+<!-- Static utility classes (replaces the Tailwind Play CDN so CSP can stay 'self'). -->
+<link rel="stylesheet" href="/utilities.css">
 <style>
   :root {
     /* Palmly palette — bright, playful, contrasting, a little cosmic */
@@ -116,6 +117,13 @@
   .btn:hover:not(:disabled) { transform: translateY(-2px) scale(1.01); box-shadow: 0 18px 40px -8px rgba(108,59,244,0.6); }
   .btn:active { transform: translateY(0) scale(.99); }
   .btn:disabled { opacity: .55; cursor: not-allowed; }
+  .btn-ghost {
+    width:100%; background: rgba(78,230,196,0.12); color: var(--mint);
+    font-weight: 800; font-size: 1rem; padding: .95rem 1.5rem;
+    border: 1.5px solid rgba(78,230,196,0.4); border-radius: 16px; cursor: pointer; transition: all .25s;
+  }
+  .btn-ghost:hover:not(:disabled){ background: rgba(78,230,196,0.2); }
+  .btn-ghost:disabled{ opacity:.55; cursor:not-allowed; }
 
   .upload {
     border: 2.5px dashed rgba(255,246,238,0.3);
@@ -169,6 +177,44 @@
   .stream-cursor::after { content:'▍'; color: var(--mint); animation: blink 1s steps(2) infinite; }
   @keyframes blink { 50%{opacity:0} }
 
+  /* Paywall lock */
+  .lock-wrap { position: relative; overflow: hidden; border-radius: 24px; }
+  .lock-fade {
+    position:absolute; left:0; right:0; bottom:0; height: 260px;
+    background: linear-gradient(to bottom, rgba(27,17,69,0) 0%, rgba(27,17,69,0.86) 55%, var(--indigo) 100%);
+    pointer-events:none;
+  }
+  .blur-teaser { filter: blur(6px); opacity:.5; user-select:none; pointer-events:none; }
+
+  /* Modal */
+  .modal-overlay {
+    position: fixed; inset: 0; z-index: 50;
+    background: rgba(10,6,28,0.72); backdrop-filter: blur(6px);
+    display:flex; align-items:center; justify-content:center; padding: 1rem;
+    animation: fadeIn .25s ease both;
+  }
+  @keyframes fadeIn { from{opacity:0} to{opacity:1} }
+  .modal {
+    width: 100%; max-width: 460px; max-height: 92vh; overflow-y:auto;
+    background: linear-gradient(160deg, #241653, #1a1140);
+    border: 1.5px solid rgba(255,246,238,0.16); border-radius: 26px;
+    padding: 1.6rem; box-shadow: 0 30px 80px -20px rgba(0,0,0,0.7);
+    animation: revealUp .35s cubic-bezier(.2,.8,.2,1) both;
+  }
+  .seg { display:flex; gap:.5rem; background: rgba(27,17,69,0.5); padding:.3rem; border-radius:14px; }
+  .seg button {
+    flex:1; padding:.6rem; border-radius:11px; border:none; cursor:pointer;
+    background:transparent; color: var(--cream-dim); font-weight:700; font-size:.9rem; transition: all .2s;
+  }
+  .seg button.active { background: linear-gradient(100deg, var(--coral), var(--grape)); color:#fff; }
+  .otp-input { letter-spacing: .5em; text-align:center; font-size:1.5rem; font-weight:800; }
+  .plan-card {
+    border: 1.5px solid rgba(255,246,238,0.16); border-radius: 18px; padding: 1.1rem; cursor:pointer;
+    transition: all .2s; background: rgba(27,17,69,0.4);
+  }
+  .plan-card.sel { border-color: var(--mint); box-shadow: 0 0 0 3px rgba(78,230,196,0.18); background: rgba(78,230,196,0.08); }
+  .x-btn { background:none; border:none; color:var(--cream-dim); font-size:1.5rem; cursor:pointer; line-height:1; }
+
   @media (max-width:640px){
     .report h1{font-size:1.5rem} .report h2{font-size:1.2rem} .report{font-size:1rem}
   }
@@ -177,268 +223,11 @@
 <body class="bg-aurora">
 <div id="app"></div>
 
-<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-<script type="text/babel" data-presets="react">
-const { useState } = React;
-
-function App() {
-  const [step, setStep] = useState('intake');
-  const [name, setName] = useState('');
-  const [gender, setGender] = useState('Female');
-  const [age, setAge] = useState('');
-  const [rightHand, setRightHand] = useState(null);
-  const [leftHand, setLeftHand] = useState(null);
-  const [rightPreview, setRightPreview] = useState(null);
-  const [leftPreview, setLeftPreview] = useState(null);
-  const [report, setReport] = useState('');
-  const [error, setError] = useState('');
-  const [progress, setProgress] = useState('');
-  const [uploading, setUploading] = useState(null);
-
-  // Convert any image (incl. iPhone HEIC) to a downscaled JPEG via canvas.
-  const processImage = (file) => new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const img = new Image();
-      img.onload = () => {
-        const maxDim = 1100;
-        let { width, height } = img;
-        if (width > maxDim || height > maxDim) {
-          if (width > height) { height = Math.round(height*maxDim/width); width = maxDim; }
-          else { width = Math.round(width*maxDim/height); height = maxDim; }
-        }
-        const c = document.createElement('canvas');
-        c.width = width; c.height = height;
-        c.getContext('2d').drawImage(img, 0, 0, width, height);
-        resolve(c.toDataURL('image/jpeg', 0.86));
-      };
-      img.onerror = () => reject(new Error('Could not read this image. Try a JPEG or PNG.'));
-      img.src = ev.target.result;
-    };
-    reader.onerror = () => reject(new Error('Could not read the file.'));
-    reader.readAsDataURL(file);
-  });
-
-  const handleUpload = async (e, hand) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    setError(''); setUploading(hand);
-    try {
-      const jpeg = await processImage(file);
-      if (hand === 'right') { setRightHand(jpeg); setRightPreview(jpeg); }
-      else { setLeftHand(jpeg); setLeftPreview(jpeg); }
-    } catch (err) {
-      setError(err.message || 'That image could not be processed.');
-    } finally { setUploading(null); }
-  };
-
-  const clearImage = (hand) => {
-    if (hand === 'right') { setRightHand(null); setRightPreview(null); }
-    else { setLeftHand(null); setLeftPreview(null); }
-  };
-
-  const generateReport = async () => {
-    if (!name.trim() || !age.trim()) { setError('Please enter your name and age.'); return; }
-    if (!rightHand && !leftHand) { setError('Please add at least one palm photo.'); return; }
-    setError(''); setStep('reading'); setProgress('Warming up the cosmic engine...');
-
-    try {
-      const msgs = ['Tracing the lines of your palm...','Reading your mounts and stars...','Consulting the planets...','Weaving your five-year forecast...','Almost there — your reading takes shape...'];
-      let i = 0;
-      const timer = setInterval(() => { setProgress(msgs[i % msgs.length]); i++; }, 6000);
-
-      let proToken = '', proEmail = '';
-      try { proToken = localStorage.getItem('palmly_pro_token') || ''; proEmail = localStorage.getItem('palmly_pro_email') || ''; } catch {}
-
-      const headers = { 'Content-Type': 'application/json' };
-      if (proToken) headers['X-Pro-Token'] = proToken;
-
-      const response = await fetch('/api/read-palm', {
-        method: 'POST', headers,
-        body: JSON.stringify({ name:String(name), gender:String(gender), age:String(age), rightHand:rightHand||null, leftHand:leftHand||null, email:proEmail }),
-      });
-      clearInterval(timer);
-
-      const ct = response.headers.get('content-type') || '';
-      if (!response.ok || ct.includes('application/json')) {
-        let data = {};
-        try { data = await response.json(); } catch {}
-        if (data.upgrade) { setError(data.error || 'Free readings used up.'); setStep('intake'); return; }
-        throw new Error(data.error || 'Reading failed.');
-      }
-
-      setStep('report'); setReport('');
-      const reader = response.body.getReader();
-      const dec = new TextDecoder();
-      let acc = '';
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        acc += dec.decode(value, { stream: true });
-        setReport(acc);
-      }
-      if (!acc.trim()) throw new Error('The reading came back empty. Please try again.');
-    } catch (err) {
-      setError(err.message || 'The stars are clouded. Please try again.');
-      setStep('intake');
-    }
-  };
-
-  const reset = () => {
-    setStep('intake'); setName(''); setAge(''); setGender('Female');
-    setRightHand(null); setLeftHand(null); setRightPreview(null); setLeftPreview(null);
-    setReport(''); setError('');
-  };
-
-  const renderReport = (md) => {
-    let html = md
-      .replace(/^# (.*$)/gim, '<h1>$1</h1>')
-      .replace(/^## (.*$)/gim, '<h2>$1</h2>')
-      .replace(/^### (.*$)/gim, '<h3>$1</h3>')
-      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-      .replace(/\*(.*?)\*/g, '<em>$1</em>')
-      .replace(/^---$/gim, '<hr/>')
-      .replace(/^- (.*$)/gim, '<li>$1</li>')
-      .split('\n\n').map(p => {
-        if (p.startsWith('<h')||p.startsWith('<hr')||p.startsWith('<li')) return p;
-        if (p.trim()==='') return '';
-        return '<p>'+p.replace(/\n/g,'<br/>')+'</p>';
-      }).join('\n')
-      .replace(/(<li>.*?<\/li>\n?)+/g, m => '<ul>'+m+'</ul>');
-    return { __html: html };
-  };
-
-  const Logo = () => (
-    <div className="flex items-center justify-center gap-2 mb-3">
-      <span style={{fontSize:'2rem'}}>✋</span>
-      <span className="display grad-text" style={{fontSize:'2.6rem', fontWeight:900, letterSpacing:'-0.02em'}}>Palmly</span>
-      <span style={{fontSize:'1.4rem'}}>✨</span>
-    </div>
-  );
-
-  return (
-    <div className="min-h-screen relative" style={{zIndex:1}}>
-      <header className="relative pt-12 pb-6 px-4 text-center reveal-up" style={{zIndex:2}}>
-        <Logo />
-        <p className="font-bold tracking-wide" style={{color:'var(--cream-dim)', fontSize:'1rem'}}>
-          Your palm, read by AI ✋ in 30 seconds
-        </p>
-      </header>
-
-      {step === 'intake' && (
-        <main className="relative px-4 pb-16 max-w-xl mx-auto reveal-up" style={{zIndex:2}}>
-          <div className="card p-6 sm:p-8">
-            <div className="text-center mb-6">
-              <span className="chip">🔮 Free reading</span>
-            </div>
-
-            <div className="space-y-5">
-              <div>
-                <label>Your name</label>
-                <input value={name} onChange={e=>setName(e.target.value)} placeholder="What should we call you?" />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label>Gender</label>
-                  <select value={gender} onChange={e=>setGender(e.target.value)}>
-                    <option>Female</option><option>Male</option><option>Other</option>
-                  </select>
-                </div>
-                <div>
-                  <label>Age</label>
-                  <input type="number" value={age} onChange={e=>setAge(e.target.value)} placeholder="Age" min="1" max="120" />
-                </div>
-              </div>
-
-              <div className="text-center pt-1">
-                <span className="font-bold" style={{color:'var(--marigold)', fontSize:'.8rem', letterSpacing:'.1em', textTransform:'uppercase'}}>📸 Add your palm</span>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                {[['right','Right hand','✋'],['left','Left hand','🤚']].map(([hand,labelText,emoji]) => {
-                  const preview = hand==='right'?rightPreview:leftPreview;
-                  return (
-                    <div key={hand}>
-                      <label>{labelText}</label>
-                      <label className={`upload block ${preview?'filled':''}`}>
-                        {preview ? (
-                          <div>
-                            <img src={preview} alt={labelText} />
-                            <button type="button" onClick={(e)=>{e.preventDefault();clearImage(hand);}} className="font-bold mt-2 underline" style={{color:'var(--coral)', fontSize:'.8rem'}}>Remove</button>
-                          </div>
-                        ) : uploading===hand ? (
-                          <div style={{padding:'1rem 0'}}><div className="orb" style={{width:40,height:40}}></div></div>
-                        ) : (
-                          <div>
-                            <div style={{fontSize:'1.8rem'}}>{emoji}</div>
-                            <p className="font-bold mt-1" style={{fontSize:'.85rem'}}>Tap to add</p>
-                          </div>
-                        )}
-                        <input type="file" accept="image/*,.heic,.heif" className="hidden" onChange={e=>handleUpload(e,hand)} />
-                      </label>
-                    </div>
-                  );
-                })}
-              </div>
-              <p className="text-center" style={{color:'var(--cream-dim)', fontSize:'.85rem'}}>One hand works. Both reveal more. 🌟</p>
-
-              {error && <div className="text-center font-semibold" style={{color:'var(--coral)'}}>{error}</div>}
-
-              <button onClick={generateReport} className="btn" disabled={uploading}>
-                Reveal My Reading ✨
-              </button>
-            </div>
-          </div>
-
-          <details className="mt-5 card p-4">
-            <summary className="flex items-center gap-2 font-bold" style={{color:'var(--marigold)', fontSize:'.85rem'}}>
-              <span className="arrow">▸</span> Is this for real?
-            </summary>
-            <p style={{color:'var(--cream-dim)', fontSize:'.92rem', marginTop:'.6rem', lineHeight:1.6}}>
-              Palmistry is a fun, ancient tradition — not science! Palmly blends classic Indian and Western palm-reading wisdom into a playful reading just for you. Take what sparks joy, leave the rest. 💛
-            </p>
-          </details>
-        </main>
-      )}
-
-      {step === 'reading' && (
-        <main className="relative px-4 py-20 max-w-md mx-auto text-center reveal-up" style={{zIndex:2}}>
-          <div className="orb mb-8"></div>
-          <p className="display grad-text-2" style={{fontSize:'1.6rem', fontWeight:700, marginBottom:'.5rem'}}>Reading your palm</p>
-          <p className="font-medium" style={{color:'var(--cream-dim)', fontSize:'1.05rem'}}>{progress}</p>
-        </main>
-      )}
-
-      {step === 'report' && (
-        <main className="relative px-4 pb-16 max-w-2xl mx-auto reveal-up" style={{zIndex:2}}>
-          <div className="card p-6 sm:p-9">
-            <div className="text-center mb-2"><span className="chip">✨ {name}'s reading</span></div>
-            <div className="report stream-cursor" dangerouslySetInnerHTML={renderReport(report)} />
-            <div className="mt-10 space-y-3">
-              <button onClick={reset} className="btn">Read Another Palm ✋</button>
-              <button onClick={()=>{
-                const shareText = `I just got my palm read by Palmly! ✋✨ Try yours free:`;
-                const url = 'https://palmist.getbriefed.to';
-                if (navigator.share) { navigator.share({title:'Palmly', text:shareText, url}).catch(()=>{}); }
-                else { navigator.clipboard?.writeText(url); alert('Link copied! Share it with friends ✨'); }
-              }} className="w-full font-bold underline" style={{color:'var(--mint)', background:'none', border:'none', cursor:'pointer', fontSize:'.95rem'}}>
-                Share Palmly with a friend 💌
-              </button>
-            </div>
-          </div>
-        </main>
-      )}
-
-      <footer className="relative text-center py-8 px-4" style={{zIndex:2}}>
-        <p style={{color:'var(--cream-dim)', fontSize:'.8rem'}}>Made with ✨ · Palmly reads for fun, not fortune</p>
-      </footer>
-    </div>
-  );
-}
-
-ReactDOM.createRoot(document.getElementById('app')).render(<App />);
-</script>
+<!-- Self-hosted, pinned vendor libraries (no third-party script origins). -->
+<script src="/vendor/react.production.min.js"></script>
+<script src="/vendor/react-dom.production.min.js"></script>
+<script src="/vendor/jspdf.umd.min.js"></script>
+<!-- Pre-compiled application bundle (built from src/app.jsx via `npm run build`). -->
+<script src="/app.js"></script>
 </body>
 </html>
