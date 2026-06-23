@@ -46,7 +46,9 @@ export default async function handler(req, res) {
         client_reference_id: owner,
         customer_email: email,
         metadata: { owner, kind: 'unlock', readingId },
-        payment_intent_data: { metadata: { owner, kind: 'unlock', readingId } },
+        // receipt_email makes Stripe email the buyer a receipt directly.
+        // (For phone-only accounts, Checkout collects the email and Stripe uses it.)
+        payment_intent_data: { metadata: { owner, kind: 'unlock', readingId }, ...(email ? { receipt_email: email } : {}) },
         success_url: success,
         cancel_url: cancel,
       });

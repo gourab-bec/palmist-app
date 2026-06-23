@@ -9,6 +9,13 @@ export async function grantFromSession(session) {
   const owner = meta.owner || session.client_reference_id;
   if (!owner) return { kind: null };
 
+  // The email the buyer actually used at Stripe checkout (records contact email,
+  // important for phone-only accounts so we have an email on file).
+  const buyerEmail = (session.customer_details && session.customer_details.email) || session.customer_email || null;
+  if (buyerEmail) {
+    try { await sbUpdate('users', `principal=eq.${encodeURIComponent(owner)}`, { email: buyerEmail }); } catch (e) { console.error('persist buyer email failed:', e.message); }
+  }
+
   if (meta.kind === 'unlock') {
     const readingId = meta.readingId;
     const paid = session.payment_status === 'paid' || session.status === 'complete';
@@ -16,7 +23,7 @@ export async function grantFromSession(session) {
       // Only unlock the owner's own reading (defense in depth).
       await sbUpdate('readings',
         `id=eq.${encodeURIComponent(readingId)}&owner=eq.${encodeURIComponent(owner)}`,
-        { unlocked: true, stripe_session_id: session.id });
+        { unlocked: true, stripe_session_id: session.id, buyer_email: buyerEmail });
     }
     return { kind: 'unlock', readingId, owner };
   }

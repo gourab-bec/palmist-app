@@ -1,7 +1,9 @@
 // api/_lib/email.js — transactional email via Resend.
 import { httpError } from './util.js';
 
-const FROM = () => process.env.RESEND_FROM || 'Palmly <noreply@getbriefed.to>';
+const FROM = () => process.env.RESEND_FROM || 'Palmly <palmist@getbriefed.to>';
+// Replies go here (forward palmist@getbriefed.to -> gourab.bec@gmail.com at your mail host).
+const REPLY_TO = () => process.env.REPLY_TO || 'palmist@getbriefed.to';
 
 export async function sendEmail({ to, subject, html, text }) {
   if (!process.env.RESEND_API_KEY) throw httpError(500, 'Email is not configured.');
@@ -11,7 +13,7 @@ export async function sendEmail({ to, subject, html, text }) {
       Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ from: FROM(), to: [to], subject, html, text }),
+    body: JSON.stringify({ from: FROM(), to: [to], reply_to: REPLY_TO(), subject, html, text }),
   });
   if (!res.ok) {
     const t = await res.text().catch(() => '');

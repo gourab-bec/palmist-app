@@ -19,6 +19,7 @@ create table if not exists users (
 -- bring v1 tables up to date
 alter table users add column if not exists bound_first_name text;
 alter table users add column if not exists bound_age int;
+alter table users add column if not exists email text;   -- contact email (primary), captured at payment if signed in by phone
 
 -- ============================== readings ===============================
 create table if not exists readings (
@@ -31,9 +32,11 @@ create table if not exists readings (
   full_report     text,                 -- the gated content (text only; no images stored)
   unlocked        boolean default false,
   stripe_session_id text,
+  buyer_email     text,
   created_at      timestamptz default now()
 );
 create index if not exists idx_readings_owner on readings(owner, created_at desc);
+alter table readings add column if not exists buyer_email text;
 
 -- ====================== daily horoscope subscribers =====================
 create table if not exists subscriptions (

@@ -25,6 +25,10 @@ export default async function handler(req, res) {
       // 402 Payment Required — front-end shows the paywall.
       return res.status(402).json({ error: 'Locked', teaser: row.teaser, entitled: false });
     }
+    // Entitled, but the full report may still be generating in the background.
+    if (!row.full_report) {
+      return res.status(200).json({ full: null, teaser: row.teaser, entitled: true, generating: true });
+    }
     return res.status(200).json({ full: row.full_report, teaser: row.teaser, entitled: true });
   } catch (err) {
     return sendError(res, err);

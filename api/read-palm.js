@@ -5,22 +5,10 @@ import { applyCors, readBody, sendError, httpError, cleanText, rateLimit, client
 import { requireAuth } from './_lib/auth.js';
 import { enforceIdentity } from './_lib/identity.js';
 import { claude, imageBlock } from './_lib/anthropic.js';
-import { palmReadingPrompt } from './_lib/prompts.js';
+import { palmTeaserPrompt } from './_lib/prompts.js';
 import { sbInsert, sbSelect } from './_lib/supabase.js';
 
-export const config = { maxDuration: 300 };
-
-// Teaser = title + first two sections; the rest is locked.
-function makeTeaser(full) {
-  const idx = nthIndex(full, '\n## ', 3);
-  let t = idx > 0 ? full.slice(0, idx) : full.slice(0, 1100);
-  return t.trim() + '\n\n*…the rest of your reading is ready below.*';
-}
-function nthIndex(str, sub, n) {
-  let i = -1;
-  while (n-- > 0) { i = str.indexOf(sub, i + 1); if (i < 0) return -1; }
-  return i;
-}
+export const config = { maxDuration: 120 };
 
 export default async function handler(req, res) {
   applyCors(req, res);
@@ -55,19 +43,20 @@ export default async function handler(req, res) {
     }
 
     const handsProvided = rightHand && leftHand ? 'Both right and left hands' : rightHand ? 'Right hand only' : 'Left hand only';
-    const content = [{ type: 'text', text: palmReadingPrompt({ name, gender, age, handsProvided }) }];
+    const content = [{ type: 'text', text: palmTeaserPrompt({ name, gender, age, handsProvided }) }];
     if (rightHand) content.push(...imageBlock(rightHand, '↑ RIGHT hand.'));
     if (leftHand) content.push(...imageBlock(leftHand, '↑ LEFT hand.'));
     if (content.length === 1) throw httpError(400, 'Palm photo must be a JPEG, PNG, or WebP image.');
 
-    const full = await claude(content, { maxTokens: 8000 });
-    const teaser = makeTeaser(full);
+    // PHASE 1: generate only the short teaser — fast. The full report is built
+    // afterwards by /api/generate-full (kept warm in the DB for instant unlock).
+    const teaser = await claude(content, { maxTokens: 1400 });
 
-    // Store the reading. NOTE: raw palm images are never persisted (privacy) — only the text.
-    // Admin accounts are auto-unlocked (payment bypassed for testing).
+    // Store the reading. NOTE: raw palm images are never persisted (privacy) — only text.
+    // full_report stays null until generate-full runs. Admins auto-unlock.
     const row = await sbInsert('readings', {
       owner, subject_name: name, subject_gender: gender, subject_age: age,
-      teaser, full_report: full, unlocked: admin, created_at: new Date().toISOString(),
+      teaser, full_report: null, unlocked: admin, created_at: new Date().toISOString(),
     }, { returning: true });
 
     // Analytics log (fire-and-forget; keeps the original table populated).

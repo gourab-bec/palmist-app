@@ -90,6 +90,25 @@ test('enforceIdentity: admin is exempt (no DB binding, any person allowed)', asy
   assert.equal(r.admin, true);
 });
 
+/* --------------------------------- generate-full --------------------------------- */
+test('generate-full: 403 for a reading you do not own', async () => {
+  installFetch([{ test: (u) => u.includes('/rest/v1/readings'), respond: () => jsonResponse([{ owner: 'email:someone@else.com', full_report: null, subject_name: 'X', subject_gender: 'F', subject_age: 30 }]) }]);
+  const { default: h } = await import('../api/generate-full.js');
+  const res = makeRes();
+  await h(makeReqJSON({ headers: { authorization: 'Bearer ' + token }, body: { readingId: RID, rightHand: 'data:image/jpeg;base64,AAAA' } }), res);
+  assert.equal(res.statusCode, 403);
+});
+
+test('generate-full: returns ready immediately if full already exists (no AI call)', async () => {
+  const calls = installFetch([{ test: (u) => u.includes('/rest/v1/readings'), respond: () => jsonResponse([{ owner: OWNER, full_report: 'ALREADY THERE', subject_name: 'X', subject_gender: 'F', subject_age: 30 }]) }]);
+  const { default: h } = await import('../api/generate-full.js');
+  const res = makeRes();
+  await h(makeReqJSON({ headers: { authorization: 'Bearer ' + token }, body: { readingId: RID } }), res);
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.ready, true);
+  assert.ok(!calls.some((c) => c.url.includes('api.anthropic.com'))); // no model call
+});
+
 /* --------------------------------- verify-otp --------------------------------- */
 function otpRoutes(codeHash, { attempts = 0 } = {}) {
   return [

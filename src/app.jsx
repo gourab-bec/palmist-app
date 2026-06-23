@@ -1,6 +1,6 @@
 import { renderReport } from './lib/markdown.js';
 
-const { useState, useEffect } = React;
+const { useState, useEffect, useRef } = React;
 
 /* ----------------------------- tiny API client ----------------------------- */
 const API = '/api';
@@ -234,6 +234,32 @@ function HoroscopeModal({ onClose, identity, palms, onSubscribed }) {
   );
 }
 
+/* ===================== DAILY HOROSCOPE PANEL (subscribers) ===================== */
+function HoroscopePanel({ horo, busy, onView, onEmail }) {
+  return (
+    <div className="card p-6 mt-5" style={{ borderColor: 'rgba(78,230,196,0.4)' }}>
+      <div className="text-center">
+        <span className="chip">🌅 Your Daily Horoscope</span>
+        <p style={{ color: 'var(--cream-dim)', fontSize: '.9rem', margin: '.6rem 0 1rem' }}>
+          You're subscribed — read today's anytime (it also arrives by email at 6 AM your time).
+        </p>
+      </div>
+      {horo && (
+        <div className="report" style={{ marginBottom: '1rem' }} dangerouslySetInnerHTML={renderReport(horo.content)} />
+      )}
+      <div className="space-y-3">
+        <button className="btn" onClick={onView} disabled={!!busy}>
+          {busy === 'view' ? 'Reading the stars…' : (horo ? "Refresh today's horoscope" : "View today's horoscope ✨")}
+        </button>
+        {horo && (
+          <button className="btn-ghost" onClick={() => downloadPdf(horo.content, 'palmly-horoscope-' + horo.date, 'Daily Horoscope · ' + horo.date)}>⬇ Download PDF</button>
+        )}
+        <button className="btn-ghost" onClick={onEmail} disabled={!!busy}>{busy === 'email' ? 'Sending…' : '📧 Email it to me'}</button>
+      </div>
+    </div>
+  );
+}
+
 /* ================================== APP ================================== */
 function App() {
   const [step, setStep] = useState('intake');
@@ -255,10 +281,16 @@ function App() {
   const [progress, setProgress] = useState('');
   const [uploading, setUploading] = useState(null);
   const [busyPay, setBusyPay] = useState(false);
+  // Background full-report generation (Phase 2). Kept in refs so it survives re-renders.
+  const fullStarted = useRef(false);
+  const fullPromise = useRef(null);
 
   const [identity, setIdentity] = useState(getIdentity());
   const [showAuth, setShowAuth] = useState(false);
+  const [authIntent, setAuthIntent] = useState('reveal'); // 'reveal' | 'signin'
   const [showHoroscope, setShowHoroscope] = useState(false);
+  const [horo, setHoro] = useState(null);       // { date, content }
+  const [horoBusy, setHoroBusy] = useState('');  // '', 'view', 'email'
   const [banner, setBanner] = useState('');
 
   // Restore prior reading + handle Stripe redirect on load
@@ -303,6 +335,9 @@ function App() {
       // Returning user (or already-unlocked): refresh entitlement so the full report
       // shows automatically if they've paid. A 402 simply keeps the paywall.
       loadFullReport(stored.readingId);
+    } else if (getSession()) {
+      // Signed in but nothing stored locally (e.g. new device) — pull their account.
+      refreshAccount();
     }
   }, []); // eslint-disable-line
 
@@ -346,15 +381,29 @@ function App() {
     if (!name.trim() || !age.trim()) { setError('Please enter your name and age.'); return; }
     if (!rightHand && !leftHand) { setError('Please add at least one palm photo.'); return; }
     setError('');
-    if (!getSession()) { setShowAuth(true); return; } // must sign up first
+    if (!getSession()) { setAuthIntent('reveal'); setShowAuth(true); return; } // must sign up first
     generateReading();
   };
 
+  // Kick off (once) the background generation of the full report. Uses the palm
+  // images still in memory; resolves when the full text is saved server-side.
+  const ensureFull = (rid) => {
+    if (!rid) return Promise.resolve();
+    if (!fullStarted.current) {
+      fullStarted.current = true;
+      fullPromise.current = api('/generate-full', { method: 'POST', body: {
+        readingId: rid, rightHand: rightHand || null, leftHand: leftHand || null,
+      }}).catch((e) => { fullStarted.current = false; throw e; });
+    }
+    return fullPromise.current;
+  };
+
   const generateReading = async () => {
-    setError(''); setStep('reading'); setProgress('Warming up the cosmic engine…');
-    const msgs = ['Tracing the lines of your palm…','Reading your mounts and stars…','Consulting the planets…','Weaving your forecast…','Almost there…'];
-    let i = 0; const timer = setInterval(() => { setProgress(msgs[i % msgs.length]); i++; }, 4000);
+    setError(''); setStep('reading'); setProgress('Reading the lines of your palm…');
+    const msgs = ['Reading the lines of your palm…','Studying your mounts…','Shaping your preview…'];
+    let i = 0; const timer = setInterval(() => { setProgress(msgs[i % msgs.length]); i++; }, 3000);
     try {
+      // PHASE 1: fast teaser.
       const d = await api('/read-palm', { method: 'POST', body: {
         name: String(name), gender: String(gender), age: String(age),
         rightHand: rightHand || null, leftHand: leftHand || null,
@@ -362,8 +411,12 @@ function App() {
       clearInterval(timer);
       setReadingId(d.readingId); setTeaser(d.teaser || ''); persistReading(d.readingId, d.teaser || '');
       setEntitled(!!d.entitled); setSubscribed(!!d.subscribed);
-      if (d.entitled) await loadFullReport(d.readingId);
-      setStep('report');
+      setStep('report'); // show the teaser immediately
+
+      // PHASE 2: build the full report in the background while they read.
+      ensureFull(d.readingId)
+        .then(() => { if (d.entitled) loadFullReport(d.readingId); }) // admins see it fill in
+        .catch(() => {});
     } catch (err) {
       clearInterval(timer);
       if (err.status === 401) { setStep('intake'); setShowAuth(true); return; }
@@ -371,9 +424,15 @@ function App() {
     }
   };
 
-  const loadFullReport = async (rid) => {
+  // Fetch the full report; if it's still generating, poll briefly until ready.
+  const loadFullReport = async (rid, tries = 0) => {
     try {
       const d = await api('/get-report?readingId=' + encodeURIComponent(rid));
+      if (d.generating) {
+        if (tries < 20) { setTimeout(() => loadFullReport(rid, tries + 1), 2000); }
+        setEntitled(true); setReadingId(rid); setStep('report');
+        return;
+      }
       setFullReport(d.full || ''); setEntitled(true); setReadingId(rid); setStep('report');
       if (d.teaser && !teaser) setTeaser(d.teaser);
     } catch (e) {
@@ -385,6 +444,9 @@ function App() {
     if (!getSession()) { setShowAuth(true); return; }
     setBusyPay(true);
     try {
+      // Make sure the full report is saved before we leave the page for Stripe
+      // (after the redirect the images are gone, so it must already be in the DB).
+      await ensureFull(readingId).catch(() => {});
       const d = await api('/create-checkout', { method: 'POST', body: { kind: 'unlock', readingId } });
       window.location.href = d.url;
     } catch (e) { setError(e.message); setBusyPay(false); }
@@ -394,12 +456,48 @@ function App() {
     setStep('intake'); setName(''); setAge(''); setGender('Female');
     setRightHand(null); setLeftHand(null); setRightPreview(null); setLeftPreview(null);
     setReadingId(null); setTeaser(''); setFullReport(''); setEntitled(false); setError('');
+    fullStarted.current = false; fullPromise.current = null;
     try { localStorage.removeItem(LS.reading); } catch {}
   };
 
   const onAuthed = (id) => {
     setIdentity(id); setShowAuth(false);
-    if (step === 'intake' && (rightHand || leftHand)) generateReading();
+    if (authIntent === 'reveal' && step === 'intake' && (rightHand || leftHand)) { generateReading(); return; }
+    // Returning sign-in: load whatever they already have.
+    refreshAccount();
+  };
+
+  // Pull the signed-in user's existing reading + subscription (no photo needed).
+  const refreshAccount = async () => {
+    try {
+      const a = await api('/my-account');
+      setSubscribed(!!a.subscribed);
+      if (a.reading) {
+        setReadingId(a.reading.readingId); setTeaser(a.reading.teaser || ''); if (a.reading.name) setName(a.reading.name);
+        persistReading(a.reading.readingId, a.reading.teaser || '');
+        if (a.reading.unlocked) { fullStarted.current = true; await loadFullReport(a.reading.readingId); }
+        else { setEntitled(false); setStep('report'); }
+      } else if (a.subscribed) {
+        setBanner('Welcome back! Open your Daily Horoscope below.'); setStep('intake');
+      } else {
+        setBanner("You're signed in. Upload a palm to get your reading."); setStep('intake');
+      }
+    } catch (e) { setBanner(e.message); }
+  };
+
+  const openSignIn = () => { setAuthIntent('signin'); setShowAuth(true); };
+
+  // On-demand daily horoscope (active subscribers / admin).
+  const viewHoroscope = async (sendEmail) => {
+    setHoroBusy(sendEmail ? 'email' : 'view');
+    try {
+      const d = await api('/horoscope-now', { method: 'POST', body: { sendEmail: !!sendEmail } });
+      setHoro({ date: d.date, content: d.content });
+      if (sendEmail) setBanner('📧 Sent today\'s horoscope to your email.');
+    } catch (e) {
+      if (e.status === 402) { setBanner('Subscribe to unlock your daily horoscope.'); setShowHoroscope(true); }
+      else setBanner(e.message);
+    } finally { setHoroBusy(''); }
   };
 
   const Logo = () => (
@@ -414,7 +512,7 @@ function App() {
     <div className="min-h-screen relative" style={{zIndex:1}}>
       <header className="relative pt-12 pb-6 px-4 text-center reveal-up" style={{zIndex:2}}>
         <Logo />
-        <p className="font-bold tracking-wide" style={{color:'var(--cream-dim)', fontSize:'1rem'}}>Your palm, read by AI ✋ in 30 seconds</p>
+        <p className="font-bold tracking-wide" style={{color:'var(--cream-dim)', fontSize:'1rem'}}>Ancient palmistry, read by AI ✨</p>
         {identity && <p style={{color:'var(--mint)', fontSize:'.78rem', marginTop:'.4rem'}}>Signed in as {identity.identifier}</p>}
       </header>
 
@@ -474,8 +572,16 @@ function App() {
               {error && <div className="text-center font-semibold" style={{color:'var(--coral)'}}>{error}</div>}
               <button onClick={onReveal} className="btn" disabled={uploading}>Reveal My Reading ✨</button>
               <p className="text-center" style={{color:'var(--cream-dim)', fontSize:'.78rem'}}>Free sign-up required · full reading + PDF for $2</p>
+              {!identity && (
+                <p className="text-center" style={{fontSize:'.85rem'}}>
+                  Already have an account?{' '}
+                  <button onClick={openSignIn} className="font-bold underline" style={{color:'var(--mint)', background:'none', border:'none', cursor:'pointer', fontSize:'.85rem'}}>Sign in</button>
+                </p>
+              )}
             </div>
           </div>
+
+          {subscribed && <HoroscopePanel horo={horo} busy={horoBusy} onView={()=>viewHoroscope(false)} onEmail={()=>viewHoroscope(true)} />}
 
           {/* Daily horoscope promo */}
           <div className="card p-6 mt-5" style={{borderColor:'rgba(78,230,196,0.35)'}}>
@@ -539,12 +645,15 @@ function App() {
                   {error && <div className="font-semibold mb-2" style={{color:'var(--coral)'}}>{error}</div>}
                   <button className="btn" onClick={unlock} disabled={busyPay}>{busyPay ? 'Opening checkout…' : 'Unlock full reading + PDF — $2'}</button>
                   <p style={{color:'var(--cream-dim)', fontSize:'.72rem', marginTop:'.6rem'}}>One-time payment · secure checkout by Stripe</p>
+                  <button onClick={()=>readingId && loadFullReport(readingId)} className="font-bold underline mt-3" style={{color:'var(--mint)', background:'none', border:'none', cursor:'pointer', fontSize:'.8rem'}}>Already paid? Refresh</button>
                 </div>
 
                 <button onClick={reset} className="btn-ghost mt-4">Read Another Palm ✋</button>
               </>
             )}
           </div>
+
+          {subscribed && <HoroscopePanel horo={horo} busy={horoBusy} onView={()=>viewHoroscope(false)} onEmail={()=>viewHoroscope(true)} />}
         </main>
       )}
 

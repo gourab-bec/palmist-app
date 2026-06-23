@@ -1,5 +1,26 @@
 // api/_lib/prompts.js — all model prompts in one place.
 
+// FAST free preview — short, so it returns in a few seconds.
+export function palmTeaserPrompt({ name, gender, age, handsProvided }) {
+  return `You are a Master Palmist (classical Indian Hast Rekha + Western traditions). From the palm image(s), write a SHORT, vivid FREE PREVIEW of about 350-450 words — enticing, specific, and true to what is visible.
+
+SUBJECT: Name ${name}, Gender ${gender}, Age ${age}. Hand(s): ${handsProvided}.
+
+Format exactly:
+# A Palm Reading for ${name}
+(one short italic caveat line that palmistry is interpretive tradition, not science)
+
+## First Impressions — The Hand as a Whole
+One rich paragraph on hand shape/elemental type and overall nature, grounded in what's visible.
+
+## A Glimpse of Your Heart Line
+One rich paragraph on love and emotional nature from the heart line.
+
+End with a single teasing line, e.g.: *Your head line, life line, fate line, career, wealth, health, relationships and a full five-year forecast await in your complete reading…*
+
+Use ONLY what the image shows. Warm, confident, observant. Do NOT write the other sections — this is just the preview.`;
+}
+
 export function palmReadingPrompt({ name, gender, age, handsProvided }) {
   return `You are acting as a Master Palmist with deep expertise in both classical Indian palmistry (Samudrik Shastra / Hast Rekha) and Western palmistry traditions. Read the attached palm image(s) and produce a best-in-class, detailed report as the most capable palmist would deliver it.
 
