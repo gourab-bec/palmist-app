@@ -1,4 +1,0 @@
-{
-  "_rule": "An entry appears here ONLY when a signed permission file exists at content/endorsements/<id>.permission.md. tests/unit/endorsements.test.js fails the build if an entry has no matching permission file. An honest empty state beats a fake wall.",
-  "endorsements": []
-}
