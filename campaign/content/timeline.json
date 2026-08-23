@@ -1,0 +1,13 @@
+{
+  "_rule": "Every entry needs a fact_id that exists in facts.json with allowed_on_site true. The timeline renderer drops entries that fail this check rather than printing an unsourced date.",
+  "entries": [
+    { "year": "2020", "title": "A family arrives, mid-pandemic", "body": "Suresh and his family make Mountain House home in 2020 — after about 25 years in the Bay Area, in a year when nobody was meeting their neighbors.", "fact_id": "identity.home2020" },
+    { "year": "2020", "title": "The Sports & Recreation Club begins", "body": "He founds the Mountain House Sports & Recreation Club so kids and parents have somewhere to stand together. There is no city yet. There is no council. There is a community that wants somewhere to play.", "fact_id": "mhsrc.founded" },
+    { "year": "2021–2023", "title": "Courts, festivals, workshops", "body": "Volleyball, throwball, badminton, ping pong. Cultural performances and festivals. A local business expo, youth services, fitness and art workshops. Season after season, not a one-off.", "fact_id": "mhsrc.programs" },
+    { "year": "2024", "title": "Mountain House becomes a city", "body": "On July 1, 2024, Mountain House incorporates — California's newest city. In March, residents elect a mayor and the first council.", "fact_id": "city.incorporated" },
+    { "year": "2024", "title": "He runs, and he loses", "body": "Suresh runs At-Large in the March 5, 2024 incorporation election and does not win. He says the shared vision brought the campaign close. Then he goes back to work in the community rather than away from it.", "fact_id": "election.2024ran" },
+    { "year": "2024–2026", "title": "More showing up", "body": "He applies to serve on the Parks and Recreation Commission and is recommended as an applicant. He keeps running club events and keeps turning up at meetings.", "fact_id": "parksrec.applied" },
+    { "year": "2026", "title": "Rotary, and a first blood drive", "body": "As a member of the Rotary Club of Mountain House, he donates at the club's first Vitalant blood drive on July 25, 2026, in the library parking lot.", "fact_id": "rotary.blooddrive" },
+    { "year": "2026", "title": "On the ballot", "body": "He pulls nomination papers on July 31 and files on August 7. Two seats. Four-year terms. November 3, 2026.", "fact_id": "election.2026qualified" }
+  ]
+}

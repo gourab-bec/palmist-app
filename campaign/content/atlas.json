@@ -1,0 +1,14 @@
+{
+  "_rule": "Coordinates are a hand-placed schematic of Mountain House, NOT survey data and NOT a slippy map. Each pin must carry a fact_id. Pins without an allowed fact are dropped at render. viewBox is 0 0 1000 700.",
+  "viewBox": "0 0 1000 700",
+  "pins": [
+    { "id": "library", "x": 520, "y": 300, "label": "Mountain House Library", "receipt": "Rotary Club of Mountain House's first Vitalant blood drive, July 25, 2026 — in the library parking lot. Suresh donated.", "fact_id": "rotary.blooddrive", "village": "Central / Town Center" },
+    { "id": "courts", "x": 350, "y": 220, "label": "The courts", "receipt": "Volleyball, throwball, badminton and ping pong tournaments run by the club he founded in 2020.", "fact_id": "mhsrc.programs", "village": "Questa" },
+    { "id": "festival", "x": 640, "y": 430, "label": "Festival ground", "receipt": "Cultural performances and festivals — the events where a young, diverse city gets to be a community.", "fact_id": "mhsrc.programs", "village": "Central / Town Center" },
+    { "id": "expo", "x": 430, "y": 500, "label": "Local business expo", "receipt": "MHSRC's local business expo: small-city economic development at neighborhood scale.", "fact_id": "mhsrc.programs", "village": "Bethany" },
+    { "id": "home", "x": 250, "y": 400, "label": "Home since 2020", "receipt": "The family made Mountain House home in 2020, during the pandemic. Exact street never published.", "fact_id": "identity.home2020", "village": "College Park" },
+    { "id": "dais", "x": 560, "y": 180, "label": "The dais", "receipt": "Two seats. Four-year terms. November 3, 2026. He filed on August 7.", "fact_id": "election.2026qualified", "village": "Central / Town Center" },
+    { "id": "parksrec", "x": 760, "y": 330, "label": "Parks & Recreation", "receipt": "He applied to serve on the Parks and Recreation Commission and was recommended as an applicant. He has not served on it.", "fact_id": "parksrec.applied", "village": "Wicklund" },
+    { "id": "workshops", "x": 300, "y": 600, "label": "Workshops & youth services", "receipt": "Fitness and art workshops, youth services — the unglamorous half of the club's calendar.", "fact_id": "mhsrc.programs", "village": "Hansen" }
+  ]
+}
